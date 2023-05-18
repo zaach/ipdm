@@ -250,18 +250,18 @@ export class EncryptedSessionCreator<
     protected readonly identity: Identity = new DecentralizedIdentity()
   ) {}
 
-  protected createInitiatorSession(initiator: InitiatorCryptoContext) {
+  protected async createInitiatorSession(initiator: InitiatorCryptoContext) {
     return new EncryptedSession<MessageValueType>(
       initiator,
-      this.transportCreator.createReceiverTransport(),
-      this.transportCreator.createSenderTransport()
+      await this.transportCreator.createReceiverTransport(),
+      await this.transportCreator.createSenderTransport()
     );
   }
-  protected createJoinerSession(joiner: JoinerCryptoContext) {
+  protected async createJoinerSession(joiner: JoinerCryptoContext) {
     return new EncryptedSession<MessageValueType>(
       joiner,
-      this.transportCreator.createReceiverTransport(),
-      this.transportCreator.createSenderTransport()
+      await this.transportCreator.createReceiverTransport(),
+      await this.transportCreator.createSenderTransport()
     );
   }
 
@@ -284,7 +284,7 @@ export class EncryptedSessionCreator<
     if (!initiator) {
       throw new Error("Invite not found");
     }
-    const session = this.createInitiatorSession(initiator);
+    const session = await this.createInitiatorSession(initiator);
     let result: MessageValueType;
     for await (const evt of session.waitForJoin()) {
       if (evt.type === SessionEventType.handshake) {
@@ -306,7 +306,7 @@ export class EncryptedSessionCreator<
     joinMessage: MessageValueType
   ): Promise<ConnectedSession<MessageValueType, BaseSessionType>> {
     const joiner = new JoinerCryptoContext();
-    const joinerSession = this.createJoinerSession(joiner);
+    const joinerSession = await this.createJoinerSession(joiner);
     const pk = this.identity.decode(invite);
     await joinerSession.join(pk, joinMessage);
     return this.#asConnectedSession(joinerSession);
@@ -363,18 +363,18 @@ export class EncryptedSessionWithReplayCreator<
   MessageValueType extends ObjectValue = ObjectValue,
   BaseSessionType extends EncryptedSessionWithReplay<MessageValueType> = EncryptedSessionWithReplay<MessageValueType>
 > extends EncryptedSessionCreator<MessageValueType, BaseSessionType> {
-  protected createInitiatorSession(initiator: InitiatorCryptoContext) {
+  protected async createInitiatorSession(initiator: InitiatorCryptoContext) {
     return new EncryptedSessionWithReplay<MessageValueType>(
       initiator,
-      this.transportCreator.createReceiverTransport(),
-      this.transportCreator.createSenderTransport()
+      await this.transportCreator.createReceiverTransport(),
+      await this.transportCreator.createSenderTransport()
     );
   }
-  protected createJoinerSession(joiner: JoinerCryptoContext) {
+  protected async createJoinerSession(joiner: JoinerCryptoContext) {
     return new EncryptedSessionWithReplay<MessageValueType>(
       joiner,
-      this.transportCreator.createReceiverTransport(),
-      this.transportCreator.createSenderTransport()
+      await this.transportCreator.createReceiverTransport(),
+      await this.transportCreator.createSenderTransport()
     );
   }
 }

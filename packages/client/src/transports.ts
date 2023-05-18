@@ -1,5 +1,7 @@
 import { EventIterator } from "./event-iterator";
 
+type Msg = { type: string; data: string };
+
 export interface ReceiverTransport {
   listen(url: string): AsyncGenerator<MessageEvent, void, void>;
   close(): Promise<void>;
@@ -8,6 +10,7 @@ export interface ReceiverTransport {
 export type SendResponse = Pick<Response, "ok" | "status" | "statusText">;
 export interface SenderTransport {
   send: (body: string, channelId: string) => Promise<SendResponse>;
+  close(): Promise<void>;
 }
 
 export class SseTransport implements ReceiverTransport {
@@ -64,14 +67,18 @@ export class FetchSenderTransport implements SenderTransport {
     } while (attempts < 5);
     throw new Error("could not send");
   }
+
+  close() {
+    return Promise.resolve();
+  }
 }
 
 // deno-lint-ignore no-explicit-any
 type Constructor<T> = { new (...args: any[]): T };
 
 export interface TransportCreator {
-  createSenderTransport: () => SenderTransport;
-  createReceiverTransport: () => ReceiverTransport;
+  createSenderTransport: () => Promise<SenderTransport>;
+  createReceiverTransport: () => Promise<ReceiverTransport>;
 }
 export class HttpTransportCreator implements TransportCreator {
   constructor(
@@ -83,10 +90,10 @@ export class HttpTransportCreator implements TransportCreator {
     private ReceiverClass: Constructor<ReceiverTransport> = SseTransport
   ) {}
 
-  createSenderTransport() {
+  async createSenderTransport() {
     return new this.SenderClass(this.options.baseSendApiUrl);
   }
-  createReceiverTransport() {
+  async createReceiverTransport() {
     return new this.ReceiverClass(this.options.baseRecieveApiUrl);
   }
 }

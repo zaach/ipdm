@@ -35,6 +35,9 @@ class TestSenderTransport implements SenderTransport {
     this.et.dispatchEvent(new MessageEvent("message", { data }));
     return Promise.resolve({} as SendResponse);
   }
+  close() {
+    return Promise.resolve();
+  }
 }
 
 class TestEncryptedSessionCreator extends EncryptedSessionCreator {
@@ -45,7 +48,7 @@ class TestEncryptedSessionCreator extends EncryptedSessionCreator {
     super();
   }
 
-  protected createInitiatorSession(initiator: InitiatorCryptoContext) {
+  protected async createInitiatorSession(initiator: InitiatorCryptoContext) {
     return new EncryptedSession(
       initiator,
       new TestReceiverTransport(this.joinerSendEvents),
@@ -53,7 +56,7 @@ class TestEncryptedSessionCreator extends EncryptedSessionCreator {
     );
   }
 
-  protected createJoinerSession(joiner: JoinerCryptoContext) {
+  protected async createJoinerSession(joiner: JoinerCryptoContext) {
     return new EncryptedSession(
       joiner,
       new TestReceiverTransport(this.initiatorSendEvents),
