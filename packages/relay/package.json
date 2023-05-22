@@ -1,0 +1,28 @@
+{
+  "name": "@ipdm/relay",
+  "version": "1.0.0",
+  "description": "Connect a browser to another browser",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "relay": "./src/relay.js"
+  },
+  "scripts": {
+    "start": "node src/relay.js",
+    "dev": "node src/relay.js"
+  },
+  "files": [
+    "src"
+  ],
+  "dependencies": {
+    "@chainsafe/libp2p-noise": "^12.0.0",
+    "@chainsafe/libp2p-yamux": "^4.0.1",
+    "@libp2p/websockets": "^6.0.1",
+    "@libp2p/mplex": "^8.0.1",
+    "@libp2p/webrtc": "^2.0.2",
+    "libp2p": "^0.45.0"
+  },
+  "devDependencies": {
+    "test-ipfs-example": "^1.0.0"
+  }
+}
