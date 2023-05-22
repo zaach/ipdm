@@ -1,16 +1,6 @@
----
-name: Monorepo with Turborepo
-slug: monorepo-turborepo
-description: Learn to implement a monorepo with a single Next.js site that has installed two local packages.
-framework: Next.js
-useCase: Documentation
-css: Tailwind
-deployUrl: https://vercel.com/new/clone?repository-url=https://github.com/vercel/examples/tree/main/solutions/monorepo&project-name=monorepo&repository-name=monorepo&root-directory=apps/app&install-command=pnpm%20install&build-command=cd%20..%2F..%20%26%26%20pnpm%20build%20--filter%3Dapp...&ignore-command=npx%20turbo-ignore
-demoUrl: https://solutions-monorepo.vercel.sh
-relatedTemplates:
-  - monorepo-nx
-  - microfrontends
----
+# IPDM
+
+Decentralized secret chat
 
 # Monorepo
 
@@ -20,6 +10,7 @@ Packages:
 
 - [./apps/ipdm](./apps/ipdm): Frontend written with Preact, Vite, Tailwind, Typescript
 - [./packages/client](./packages/client): Exports UI components that use TypeScript and Tailwind CSS and is compiled by SWC.
+- [./packages/relay](./packages/relay): Libp2p relay server
 
 ## Dev
 
@@ -29,4 +20,4 @@ Next, run `app` in development mode:
 pnpm dev
 ```
 
-The app should be up and running at http://localhost:3000.
+The app should be up and running at http://localhost:5174.
