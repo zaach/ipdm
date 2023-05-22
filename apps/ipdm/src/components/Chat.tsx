@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useContext } from "preact/hooks";
 import { computed, useSignal, effect } from "@preact/signals";
 import {
   AppState,
+  AppStateData,
   ConnectionStatus,
   ChatStatus,
   createAppState,
@@ -14,9 +15,24 @@ import { UpdateUsernameDialog } from "../components/UpdateUsernameDialog";
 import { Header } from "../components/Header";
 import { MessageBox } from "../components/Messages";
 
-export default function ChatWrapper() {
+export default function StateWrapper() {
+  const appState = useSignal<AppStateData>(undefined!);
+  useEffect(() => {
+    const fn = async () => {
+      const state = await createAppState();
+      appState.value = state;
+    };
+    fn();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const isLoaded = computed(() => typeof appState.value !== "undefined");
+  console.log("render?", isLoaded.value, appState.value);
+  return isLoaded.value ? <ChatWrapper appState={appState.value!} /> : null;
+}
+
+export function ChatWrapper({ appState }: { appState: AppStateData }) {
   return (
-    <AppState.Provider value={createAppState()}>
+    <AppState.Provider value={appState}>
       <Chat />
     </AppState.Provider>
   );

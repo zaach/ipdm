@@ -10,7 +10,7 @@ import { Message } from "./types";
 
 const IS_BROWSER = typeof window !== "undefined";
 
-type AppStateData = ReturnType<typeof createAppState>;
+export type AppStateData = Awaited<ReturnType<typeof createAppState>>;
 export const AppState = createContext<AppStateData>(undefined!);
 
 export enum ConnectionStatus {
@@ -27,14 +27,19 @@ export enum ChatStatus {
   error,
 }
 
-export function createAppState() {
-  const { eventTarget, chatContext } = ChatContext.createEncryptedChatContext();
+export async function createAppState() {
+  const relayAddr = import.meta.env.RELAY_ADDR;
+  console.log("relayAddr", relayAddr);
+  const { eventTarget, chatContext } =
+    await ChatContext.createP2PEncryptedChatContext({
+      relayAddr,
+    });
 
   const username = signal(
     (IS_BROWSER && localStorage?.getItem("username")) || ""
   );
 
-  if (typeof window !== "undefined") {
+  if (IS_BROWSER) {
     effect(
       () => username.value && localStorage.setItem("username", username.value)
     );

@@ -16,7 +16,7 @@ import {
   SessionEventValues,
   SessionWithReplay,
 } from "./session";
-import { HttpTransportCreator } from "./transports";
+import { HttpTransportCreator, P2PPrivateTransportCreator } from "./transports";
 
 export class ChatContext<
   SessionCreatorType extends SessionCreator<MessageValue> = SessionCreator<MessageValue>
@@ -48,6 +48,23 @@ export class ChatContext<
     const chatContext = new DurableChatContext(
       eventTarget,
       new EncryptedSessionWithReplayCreator(new HttpTransportCreator(config))
+    );
+    return { eventTarget, chatContext };
+  }
+
+  static async createP2PEncryptedChatContext({
+    relayAddr,
+  }: {
+    relayAddr: string;
+  }) {
+    const eventTarget = new EventTarget();
+    const node = await P2PPrivateTransportCreator.createPrivateLibp2pNode();
+    const transportCreator = new P2PPrivateTransportCreator(node, {
+      relayAddr,
+    });
+    const chatContext = new DurableChatContext(
+      eventTarget,
+      new EncryptedSessionWithReplayCreator(transportCreator)
     );
     return { eventTarget, chatContext };
   }

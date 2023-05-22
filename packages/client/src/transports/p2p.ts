@@ -1,4 +1,4 @@
-import {
+import type {
   ReceiverTransport,
   SenderTransport,
   TransportCreator,
@@ -7,7 +7,6 @@ import { Libp2p, createLibp2p } from "libp2p";
 import { pushable, Pushable } from "it-pushable";
 import { multiaddr } from "@multiformats/multiaddr";
 import { pipe } from "it-pipe";
-import { tcp } from "@libp2p/tcp";
 import { bootstrap } from "@libp2p/bootstrap";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { webRTC, webRTCDirect } from "@libp2p/webrtc";
@@ -175,6 +174,7 @@ export class P2PPublicTransportCreator implements TransportCreator {
   }
 
   static async createPublicLibp2pNode(options?: { bootstrapAddrs?: string[] }) {
+    const { tcp } = await import("@libp2p/tcp");
     const node = await createLibp2p({
       addresses: {
         listen: [

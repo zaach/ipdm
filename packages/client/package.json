@@ -5,20 +5,21 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "dev": "pnpm build --watch",
-    "build": "rm -fr dist/* && tsc",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
     "lint": "TIMING=1 eslint \"**/*.{ts,tsx,js,jsx}\" --fix",
     "clean": "rm -rf ./dist && rm -rf .turbo",
     "test": "tap --no-coverage --node-arg=--loader=tsx src/**/*.test.ts src/*.test.ts"
   },
   "sideEffects": false,
   "type": "module",
+  "main": "./dist/index.umd.cjs",
+  "module": "./dist/index.js",
   "exports": {
-    ".": "./dist/index.js",
-    "./*": [
-      "./dist/*.js",
-      "./dist/*/index.js"
-    ]
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.umd.cjs"
+    }
   },
   "typesVersions": {
     "*": {
@@ -44,11 +45,14 @@
   "devDependencies": {
     "@types/jest": "^29.2.4",
     "@types/tap": "^15.0.7",
+    "@zaach/rollup-plugin-node-polyfills": "^0.2.2",
     "eslint": "^8.11.0",
     "tap": "^16.3.2",
     "tape": "^5.6.1",
     "tsx": "^3.12.1",
-    "typescript": "^4.5.5"
+    "typescript": "^5.0.4",
+    "vite": "^4.2.1",
+    "vite-plugin-dts": "^2.3.0"
   },
   "dependencies": {
     "@chainsafe/libp2p-noise": "^12.0.0",
