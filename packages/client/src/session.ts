@@ -379,18 +379,24 @@ export class EncryptedSessionWithReplayCreator<
   MessageValueType extends ObjectValue = ObjectValue,
   BaseSessionType extends EncryptedSessionWithReplay<MessageValueType> = EncryptedSessionWithReplay<MessageValueType>
 > extends EncryptedSessionCreator<MessageValueType, BaseSessionType> {
-  protected async createInitiatorSession(initiator: InitiatorCryptoContext) {
+  protected async createInitiatorSession(
+    initiator: InitiatorCryptoContext,
+    params?: TransportParams
+  ) {
     return new EncryptedSessionWithReplay<MessageValueType>(
       initiator,
-      await this.transportCreator.createReceiverTransport(),
-      await this.transportCreator.createSenderTransport()
+      await this.transportCreator.createReceiverTransport(params),
+      await this.transportCreator.createSenderTransport(params)
     );
   }
-  protected async createJoinerSession(joiner: JoinerCryptoContext) {
+  protected async createJoinerSession(
+    joiner: JoinerCryptoContext,
+    params?: TransportParams
+  ) {
     return new EncryptedSessionWithReplay<MessageValueType>(
       joiner,
-      await this.transportCreator.createReceiverTransport(),
-      await this.transportCreator.createSenderTransport()
+      await this.transportCreator.createReceiverTransport(params),
+      await this.transportCreator.createSenderTransport(params)
     );
   }
 }
