@@ -16,7 +16,8 @@ import {
   SessionEventValues,
   SessionWithReplay,
 } from "./session";
-import { HttpTransportCreator, P2PPrivateTransportCreator } from "./transports";
+import { DecentralizedIdentity } from "./identity";
+import { HttpTransportCreator, P2PTransportCreator } from "./transports";
 
 export class ChatContext<
   SessionCreatorType extends SessionCreator<MessageValue> = SessionCreator<MessageValue>
@@ -58,13 +59,14 @@ export class ChatContext<
     relayAddr: string;
   }) {
     const eventTarget = new EventTarget();
-    const node = await P2PPrivateTransportCreator.createPrivateLibp2pNode();
-    const transportCreator = new P2PPrivateTransportCreator(node, {
-      relayAddr,
-    });
+    // Wait until we have a node with a relayed address
+    const { node, connectingAddr } =
+      await P2PTransportCreator.createPrivateLibp2pNode({ relayAddr });
+    const transportCreator = new P2PTransportCreator(node);
+    const identity = new DecentralizedIdentity({ addr: connectingAddr });
     const chatContext = new DurableChatContext(
       eventTarget,
-      new EncryptedSessionWithReplayCreator(transportCreator)
+      new EncryptedSessionWithReplayCreator(transportCreator, identity)
     );
     return { eventTarget, chatContext };
   }
@@ -98,16 +100,11 @@ export class ChatContext<
   }
 
   async createInviteAndWait() {
-    const invite = await this.sessionCreator.createInvite();
-    this.#initSession(invite);
-    this.emit(ChatEventType.invite, { invite });
-    return invite;
-  }
-  async #initSession(invite: string) {
-    const { joinMessage, session } = await this.sessionCreator.waitForJoin(
-      invite,
-      (e) => this.#handleSessionJoinEvent(e)
+    const { invite, joinPromise } = await this.sessionCreator.waitForJoin((e) =>
+      this.#handleSessionJoinEvent(e)
     );
+    this.emit(ChatEventType.invite, { invite });
+    const { session, joinMessage } = await joinPromise;
     this.session = session;
     this.#listen();
     await this.#handleMessage(joinMessage);

@@ -2,10 +2,12 @@ import type {
   ReceiverTransport,
   SenderTransport,
   TransportCreator,
+  TransportParams,
 } from "../transports";
 import { Libp2p, createLibp2p } from "libp2p";
+import type { Stream } from "@libp2p/interface-connection";
 import { pushable, Pushable } from "it-pushable";
-import { multiaddr } from "@multiformats/multiaddr";
+import { multiaddr, protocols } from "@multiformats/multiaddr";
 import { pipe } from "it-pipe";
 import { bootstrap } from "@libp2p/bootstrap";
 import { yamux } from "@chainsafe/libp2p-yamux";
@@ -18,99 +20,130 @@ import { noise } from "@chainsafe/libp2p-noise";
 import { identifyService } from "libp2p/identify";
 
 const PROTO = "/5edm/1.0.0";
+const WEBRTC_CODE = protocols("webrtc").code;
 
-export class P2PReceiverTransport implements ReceiverTransport {
+// There are two cases:
+// - initiator creates a receiver transport and sends an invite to the joiner
+//    - the sender transport can share the duplex stream with the receiver transport once the joiner accepts the invite
+// - joiner creates a sender transport and dials the initiator based on the invite
+//   - the joiner's receiver transport should begin listening once the dial completes
+
+class P2PTransport {
   #libp2p: Libp2p;
-  #channels: Map<string, Pushable<MessageEvent, void, void>> = new Map();
+  #inChannel: Pushable<MessageEvent, void, void> = pushable<MessageEvent>({
+    objectMode: true,
+  });
+  #outChannel: Pushable<Uint8Array, void, void> = pushable();
+  #addr?: string;
+  #inChannelConnected = false;
+  #outChannelConnected = false;
+
+  constructor(
+    libp2p: Libp2p,
+    options?: {
+      connectingAddress: string;
+    }
+  ) {
+    this.#libp2p = libp2p;
+    this.#addr = options?.connectingAddress;
+
+    libp2p.addEventListener("connection:open", (event) => {
+      console.log("connection:open", event.detail);
+      this.#checkConnections();
+    });
+    libp2p.addEventListener("connection:close", (event) => {
+      console.log("connection:close", event.detail);
+      this.#checkConnections();
+    });
+  }
+
+  #checkConnections() {
+    const connections = this.#libp2p.getConnections();
+    const connected = connections.length > 0;
+    if (connected) {
+      this.#inChannel.push(
+        new MessageEvent("open", { data: { readyState: 1 } })
+      );
+    } else {
+      this.#inChannel.push(
+        new MessageEvent("error", { data: { readyState: 2 } })
+      );
+    }
+  }
+
+  listen(_channelId: string): AsyncGenerator<MessageEvent, void, void> {
+    if (!this.#inChannelConnected) {
+      this.#libp2p.handle(PROTO, ({ stream, connection: _connection }) => {
+        this.#setInStream(stream);
+        this.#setOutStream(stream);
+      });
+    }
+
+    return this.#inChannel;
+  }
+
+  #setInStream(stream: Stream) {
+    pipe(stream, async (source) => {
+      for await (const msg of source) {
+        this.#inChannel.push(
+          new MessageEvent("message", {
+            data: new TextDecoder().decode(msg.subarray()),
+          })
+        );
+      }
+      this.#checkConnections();
+    });
+    this.#inChannelConnected = true;
+  }
+
+  async closeListener(): Promise<void> {
+    await this.#libp2p.unhandle(PROTO);
+    this.#inChannel.end();
+  }
+
+  async #connect() {
+    if (this.#outChannelConnected) {
+      return this.#outChannel;
+    }
+    const addr = this.#addr;
+    const ma = multiaddr(addr);
+    const conn = await this.#libp2p.dial(ma);
+    const stream = await conn.newStream([PROTO]);
+
+    this.#setInStream(stream);
+    this.#setOutStream(stream);
+
+    return this.#outChannel;
+  }
+
+  #setOutStream(stream: Stream) {
+    pipe(this.#outChannel, stream);
+    this.#outChannelConnected = true;
+  }
+
+  async send(body: string, _channelId: string) {
+    const sender = await this.#connect();
+    sender.push(new TextEncoder().encode(body));
+    return { ok: true, status: 200, statusText: "OK" };
+  }
+
+  async closeSender() {
+    this.#outChannel.end();
+  }
+}
+
+export class P2PTransportCreator implements TransportCreator {
+  #libp2p: Libp2p;
+  #transport?: P2PTransport;
 
   constructor(libp2p: Libp2p) {
     this.#libp2p = libp2p;
   }
 
-  #getChannel(channelId: string) {
-    if (this.#channels.has(channelId)) {
-      return this.#channels.get(channelId)!;
-    }
-    const sender = pushable<MessageEvent>({ objectMode: true });
-    this.#channels.set(channelId, sender);
-    return sender;
-  }
-
-  listen(channelId: string): AsyncGenerator<MessageEvent, void, void> {
-    const pushableStream = this.#getChannel(channelId);
-    this.#libp2p.handle(PROTO, ({ stream }) => {
-      pipe(stream, async function (source) {
-        for await (const msg of source) {
-          pushableStream.push(
-            new MessageEvent("message", {
-              data: new TextDecoder().decode(msg.subarray()),
-            })
-          );
-        }
-      });
-    });
-
-    return pushableStream;
-  }
-
-  async close(): Promise<void> {
-    await this.#libp2p.unhandle(PROTO);
-    for (const s of this.#channels.values()) {
-      s.end();
-    }
-  }
-}
-
-export class P2PSenderTransport implements SenderTransport {
-  #libp2p: Libp2p;
-  #relayAddr?: string;
-  #channels: Map<string, Pushable<Uint8Array, void, void>> = new Map();
-
-  constructor(libp2p: Libp2p, options: { relayAddr?: string } = {}) {
-    this.#libp2p = libp2p;
-    this.#relayAddr = options.relayAddr;
-  }
-
-  async #connect(channelId: string) {
-    if (this.#channels.has(channelId)) {
-      return this.#channels.get(channelId)!;
-    }
-    const sender = pushable();
-    const addr =
-      channelId.includes("webrtc") && this.#relayAddr
-        ? this.#relayAddr + channelId
-        : channelId;
-    const stream = await this.#libp2p.dialProtocol(multiaddr(addr), PROTO);
-    pipe(sender, stream);
-    this.#channels.set(channelId, sender);
-    return sender;
-  }
-
-  async send(body: string, channelId: string) {
-    const sender = await this.#connect(channelId);
-    sender.push(new TextEncoder().encode(body));
-    return { ok: true, status: 200, statusText: "OK" };
-  }
-
-  async close() {
-    for (const s of this.#channels.values()) {
-      s.end();
-    }
-  }
-}
-
-export class P2PPrivateTransportCreator implements TransportCreator {
-  #libp2p: Libp2p;
-  #relayAddr?: string;
-
-  constructor(libp2p: Libp2p, options: { relayAddr: string }) {
-    this.#relayAddr = options.relayAddr;
-    this.#libp2p = libp2p;
-  }
-
-  static async createPrivateLibp2pNode(options?: {
+  static async createPrivateLibp2pNode(options: {
     bootstrapAddrs?: string[];
-  }) {
+    relayAddr: string;
+  }): Promise<{ node: Libp2p; connectingAddr: string }> {
     const node = await createLibp2p({
       addresses: {
         listen: ["/webrtc"],
@@ -127,6 +160,17 @@ export class P2PPrivateTransportCreator implements TransportCreator {
       ],
       connectionEncryption: [noise()],
       streamMuxers: [yamux(), mplex()],
+      peerDiscovery: options?.bootstrapAddrs?.length
+        ? [
+            bootstrap({
+              list: options.bootstrapAddrs,
+              timeout: 1000, // in ms,
+              tagName: "bootstrap",
+              tagValue: 50,
+              tagTTL: 120000, // in ms
+            }),
+          ]
+        : [],
       connectionGater: {
         denyDialMultiaddr: () => {
           // by default we refuse to dial local addresses from the browser since they
@@ -140,37 +184,22 @@ export class P2PPrivateTransportCreator implements TransportCreator {
         identify: identifyService(),
       },
     });
-
-    node.addEventListener("connection:open", (event) => {
-      console.log("connection:open", event.detail);
+    // wait until peer update shows the webrtc relay address is ready
+    return new Promise(async (resolve) => {
+      node.addEventListener("self:peer:update", (_event) => {
+        for (const addr of node.getMultiaddrs()) {
+          console.log("addr", addr);
+          const connectingAddr = addr.toString();
+          if (
+            connectingAddr.includes(options.relayAddr) &&
+            connectingAddr.includes("webrtc")
+          ) {
+            resolve({ node, connectingAddr });
+          }
+        }
+      });
+      await node.dial(multiaddr(options.relayAddr));
     });
-    node.addEventListener("connection:close", (event) => {
-      console.log("connection:close", event.detail);
-    });
-    node.addEventListener("self:peer:update", (event) => {
-      console.log("self:peer:update", event.detail);
-    });
-
-    return node;
-  }
-
-  async createSenderTransport() {
-    const node = this.#libp2p;
-    return new P2PSenderTransport(node, { relayAddr: this.#relayAddr });
-  }
-
-  async createReceiverTransport() {
-    const node = this.#libp2p;
-    await node.dial(multiaddr(this.#relayAddr));
-    return new P2PReceiverTransport(node);
-  }
-}
-
-export class P2PPublicTransportCreator implements TransportCreator {
-  #libp2p: Libp2p;
-
-  constructor(node: Libp2p) {
-    this.#libp2p = node;
   }
 
   static async createPublicLibp2pNode(options?: { bootstrapAddrs?: string[] }) {
@@ -218,28 +247,50 @@ export class P2PPublicTransportCreator implements TransportCreator {
       },
     });
 
-    node.addEventListener("connection:open", (event) => {
-      console.log("connection:open", event.detail);
-    });
-    node.addEventListener("connection:close", (event) => {
-      console.log("connection:close", event.detail);
-    });
-    node.addEventListener("self:peer:update", (event) => {
-      console.log("self:peer:update", event.detail);
-    });
+    await node.start();
 
     return node;
   }
 
-  async createSenderTransport() {
-    const node = this.#libp2p;
-    await node.start();
-    return new P2PSenderTransport(node);
+  async createSenderTransport(params?: TransportParams) {
+    if (!this.#transport) {
+      this.#transport = new P2PTransport(this.#libp2p, params);
+    }
+    return new P2PSenderTransport(this.#transport);
   }
 
-  async createReceiverTransport() {
-    const node = this.#libp2p;
-    await node.start();
-    return new P2PReceiverTransport(node);
+  async createReceiverTransport(params?: TransportParams) {
+    if (!this.#transport) {
+      this.#transport = new P2PTransport(this.#libp2p, params);
+    }
+    return new P2PReceiverTransport(this.#transport);
+  }
+}
+
+export class P2PReceiverTransport implements ReceiverTransport {
+  #transport: P2PTransport;
+
+  constructor(transport: P2PTransport) {
+    this.#transport = transport;
+  }
+  listen(channelId: string): AsyncGenerator<MessageEvent, void, void> {
+    return this.#transport.listen(channelId);
+  }
+  async close(): Promise<void> {
+    this.#transport.closeListener();
+  }
+}
+
+export class P2PSenderTransport implements SenderTransport {
+  #transport: P2PTransport;
+
+  constructor(transport: P2PTransport) {
+    this.#transport = transport;
+  }
+  async send(body: string, channelId: string) {
+    return this.#transport.send(body, channelId);
+  }
+  async close() {
+    this.#transport.closeSender();
   }
 }

@@ -43,6 +43,7 @@
     "dist"
   ],
   "devDependencies": {
+    "@libp2p/interface-connection": "^5.1.0",
     "@types/jest": "^29.2.4",
     "@types/tap": "^15.0.7",
     "@zaach/rollup-plugin-node-polyfills": "^0.2.2",
@@ -68,6 +69,7 @@
     "hpke-js": "^0.15.0",
     "it-pipe": "^3.0.1",
     "it-pushable": "^3.1.0",
+    "jose": "^4.14.4",
     "libp2p": "^0.45.0",
     "uint8arrays": "^4.0.2"
   }

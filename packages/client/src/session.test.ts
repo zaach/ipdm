@@ -81,10 +81,10 @@ describe("EncryptedSession", () => {
       initiatorSendEvents
     );
 
-    const invite = await creator.createInvite();
+    const { invite, joinPromise } = await creator.waitForJoin();
 
     (async function () {
-      const { joinMessage, session } = await creator.waitForJoin(invite);
+      const { joinMessage, session } = await joinPromise;
       assertEquals(joinMessage, { nice: "v nice" });
 
       await session.send({ ello: "poppet" });

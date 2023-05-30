@@ -9,9 +9,14 @@ export interface SenderTransport {
   close(): Promise<void>;
 }
 
+export type TransportParams = {
+  connectingAddress: string;
+};
 export interface TransportCreator {
-  createSenderTransport: () => Promise<SenderTransport>;
-  createReceiverTransport: () => Promise<ReceiverTransport>;
+  createSenderTransport: (params?: TransportParams) => Promise<SenderTransport>;
+  createReceiverTransport: (
+    params?: TransportParams
+  ) => Promise<ReceiverTransport>;
 }
 
 export * from "./transports/http";

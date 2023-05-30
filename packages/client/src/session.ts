@@ -14,6 +14,7 @@ import {
   SendResponse,
   SseTransport,
   TransportCreator,
+  TransportParams,
 } from "./transports";
 
 import { DecentralizedIdentity, Identity } from "./identity";
@@ -224,13 +225,14 @@ export interface SessionCreator<
   BaseSessionType extends Session<MessageValueType> = Session<MessageValueType>,
   SessionType = ConnectedSession<MessageValueType, BaseSessionType>
 > {
-  createInvite(): Promise<string>;
   waitForJoin(
-    invite: string,
     handleEvent?: (e: SessionEventValues<MessageValueType>) => void
   ): Promise<{
-    joinMessage: MessageValueType;
-    session: SessionType;
+    invite: string;
+    joinPromise: Promise<{
+      joinMessage: MessageValueType;
+      session: SessionType;
+    }>;
   }>;
   joinWithInvite(
     invite: string,
@@ -243,61 +245,68 @@ export class EncryptedSessionCreator<
   BaseSessionType extends Session<MessageValueType> = EncryptedSession<MessageValueType>
 > implements SessionCreator<MessageValueType, BaseSessionType>
 {
-  #inviteContext: Map<string, InitiatorCryptoContext> = new Map();
-
   constructor(
     protected readonly transportCreator: TransportCreator = new HttpTransportCreator(),
     protected readonly identity: Identity = new DecentralizedIdentity()
   ) {}
 
-  protected async createInitiatorSession(initiator: InitiatorCryptoContext) {
+  protected async createInitiatorSession(
+    initiator: InitiatorCryptoContext,
+    params?: TransportParams
+  ) {
     return new EncryptedSession<MessageValueType>(
       initiator,
-      await this.transportCreator.createReceiverTransport(),
-      await this.transportCreator.createSenderTransport()
+      await this.transportCreator.createReceiverTransport(params),
+      await this.transportCreator.createSenderTransport(params)
     );
   }
-  protected async createJoinerSession(joiner: JoinerCryptoContext) {
+  protected async createJoinerSession(
+    joiner: JoinerCryptoContext,
+    params?: TransportParams
+  ) {
     return new EncryptedSession<MessageValueType>(
       joiner,
-      await this.transportCreator.createReceiverTransport(),
-      await this.transportCreator.createSenderTransport()
+      await this.transportCreator.createReceiverTransport(params),
+      await this.transportCreator.createSenderTransport(params)
     );
   }
 
-  public async createInvite() {
+  async #createInvite() {
     const initiator = new InitiatorCryptoContext();
     const { serializedPublicKey: ipk } = await initiator.init();
-    const encodedPk = this.identity.encode(new Uint8Array(ipk));
-    this.#inviteContext.set(encodedPk, initiator);
-    return encodedPk;
+    const invite = this.identity.encodeInvite({ iss: new Uint8Array(ipk) });
+    return { initiator, invite };
   }
 
   public async waitForJoin(
-    invite: string,
     handleEvent?: (e: SessionEventValues<MessageValueType>) => void
   ): Promise<{
-    joinMessage: MessageValueType;
-    session: ConnectedSession<MessageValueType, BaseSessionType>;
+    invite: string;
+    joinPromise: Promise<{
+      joinMessage: MessageValueType;
+      session: ConnectedSession<MessageValueType, BaseSessionType>;
+    }>;
   }> {
-    const initiator = this.#inviteContext.get(invite);
-    if (!initiator) {
-      throw new Error("Invite not found");
-    }
-    const session = await this.createInitiatorSession(initiator);
-    let result: MessageValueType;
-    for await (const evt of session.waitForJoin()) {
-      if (evt.type === SessionEventType.handshake) {
-        result = evt.detail;
-        break;
-      }
-      if (handleEvent) {
-        handleEvent(evt);
-      }
-    }
+    const { initiator, invite } = await this.#createInvite();
     return {
-      joinMessage: result!,
-      session: this.#asConnectedSession(session),
+      invite,
+      joinPromise: new Promise(async (resolve, _reject) => {
+        const session = await this.createInitiatorSession(initiator);
+        let result: MessageValueType;
+        for await (const evt of session.waitForJoin()) {
+          if (evt.type === SessionEventType.handshake) {
+            result = evt.detail;
+            break;
+          }
+          if (handleEvent) {
+            handleEvent(evt);
+          }
+        }
+        return resolve({
+          joinMessage: result!,
+          session: this.#asConnectedSession(session),
+        });
+      }),
     };
   }
 
@@ -306,9 +315,16 @@ export class EncryptedSessionCreator<
     joinMessage: MessageValueType
   ): Promise<ConnectedSession<MessageValueType, BaseSessionType>> {
     const joiner = new JoinerCryptoContext();
-    const joinerSession = await this.createJoinerSession(joiner);
-    const pk = this.identity.decode(invite);
-    await joinerSession.join(pk, joinMessage);
+    const data = this.identity.decodeInvite(invite);
+    const joinerSession = await this.createJoinerSession(
+      joiner,
+      data.claims?.addr
+        ? {
+            connectingAddress: data.claims.addr,
+          }
+        : undefined
+    );
+    await joinerSession.join(data.iss, joinMessage);
     return this.#asConnectedSession(joinerSession);
   }
 
