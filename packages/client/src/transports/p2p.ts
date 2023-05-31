@@ -29,12 +29,10 @@ const PROTO = "/5edm/1.0.0";
 
 class P2PTransport {
   #libp2p: Libp2p;
-  #inChannel: Pushable<MessageEvent, void, void> = pushable<MessageEvent>({
-    objectMode: true,
-  });
+  #inChannel?: AsyncGenerator<MessageEvent, void, void>;
   #outChannel: Pushable<Uint8Array, void, void> = pushable();
   #addr?: string;
-  #isStreamConnected = false;
+  #stream?: Stream;
 
   constructor(
     libp2p: Libp2p,
@@ -48,20 +46,10 @@ class P2PTransport {
     libp2p.addEventListener("connection:open", (event) => {
       console.log("connection:open", event.detail);
       this.#checkConnections();
-      if (this.#libp2p.getConnections().length) {
-        this.#inChannel.push(
-          new MessageEvent("open", { data: { readyState: 1 } })
-        );
-      }
     });
     libp2p.addEventListener("connection:close", (event) => {
       console.log("connection:close", event.detail);
       this.#checkConnections();
-      if (!this.#libp2p.getConnections().length) {
-        this.#inChannel.push(
-          new MessageEvent("error", { data: { readyState: 2 } })
-        );
-      }
     });
   }
 
@@ -70,53 +58,86 @@ class P2PTransport {
     console.log("connections", connections);
   }
 
-  listen(_channelId: string): AsyncGenerator<MessageEvent, void, void> {
-    if (!this.#isStreamConnected) {
-      this.#libp2p.handle(PROTO, ({ stream, connection: _connection }) => {
-        console.log("handled", stream, _connection);
-        this.#setStream(stream);
-      });
-    }
-
-    return this.#inChannel;
+  #newSource(): AsyncGenerator<MessageEvent<any>, void, void> {
+    const self = this;
+    let started = false;
+    return {
+      async next(): Promise<IteratorResult<MessageEvent<any>>> {
+        const stream = await self.#connect();
+        if (!started) {
+          started = true;
+          return {
+            done: false,
+            value: new MessageEvent("open", { data: { readyState: 1 } }),
+          };
+        }
+        const next = await stream.source.next();
+        if (next.done) {
+          return {
+            done: true,
+            value: new MessageEvent("error", { data: { readyState: 2 } }),
+          };
+        }
+        return {
+          done: false,
+          value: new MessageEvent("message", {
+            data: new TextDecoder().decode(next.value.subarray()),
+          }),
+        };
+      },
+      async return(): Promise<IteratorResult<MessageEvent<any>>> {
+        return {
+          done: true,
+          value: new MessageEvent("error", { data: { readyState: 2 } }),
+        };
+      },
+      async throw(): Promise<IteratorResult<MessageEvent<any>>> {
+        return {
+          done: true,
+          value: new MessageEvent("error", { data: { readyState: 2 } }),
+        };
+      },
+      [Symbol.asyncIterator]() {
+        return this;
+      },
+    };
   }
 
-  #setStream(stream: Stream) {
-    pipe(this.#outChannel, stream, async (source) => {
-      for await (const msg of source) {
-        this.#inChannel.push(
-          new MessageEvent("message", {
-            data: new TextDecoder().decode(msg.subarray()),
-          })
-        );
-      }
-    });
-    this.#isStreamConnected = true;
+  listen(_channelId: string): AsyncGenerator<MessageEvent, void, void> {
+    return this.#newSource()[Symbol.asyncIterator]();
   }
 
   async closeListener(): Promise<void> {
     await this.#libp2p.unhandle(PROTO);
-    this.#inChannel.end();
+    this.#inChannel?.return();
   }
 
   async #connect() {
-    if (this.#isStreamConnected) {
-      return this.#outChannel;
+    if (this.#stream) {
+      return this.#stream;
     }
-    const addr = this.#addr;
-    const ma = multiaddr(addr);
-    const conn = await this.#libp2p.dial(ma);
-    const stream = await conn.newStream([PROTO]);
-    console.log("send stream", stream, conn);
+    if (this.#addr) {
+      const addr = this.#addr;
+      const ma = multiaddr(addr);
+      const conn = await this.#libp2p.dial(ma);
+      const stream = await conn.newStream([PROTO]);
+      this.#stream = stream;
+      pipe(this.#outChannel, stream);
+    } else {
+      this.#stream = await new Promise((resolve) => {
+        this.#libp2p.handle(PROTO, ({ stream, connection: _connection }) => {
+          pipe(this.#outChannel, stream);
+          resolve(stream);
+        });
+      });
+    }
 
-    this.#setStream(stream);
-
-    return this.#outChannel;
+    return this.#stream;
   }
 
   async send(body: string, _channelId: string) {
-    const sender = await this.#connect();
-    sender.push(new TextEncoder().encode(body));
+    await this.#connect();
+    this.#outChannel.push(new TextEncoder().encode(body));
     return { ok: true, status: 200, statusText: "OK" };
   }
 
@@ -181,7 +202,6 @@ export class P2PTransportCreator implements TransportCreator {
     return new Promise(async (resolve) => {
       node.addEventListener("self:peer:update", (_event) => {
         for (const addr of node.getMultiaddrs()) {
-          console.log("addr", addr);
           const connectingAddr = addr.toString();
           if (
             connectingAddr.includes(options.relayAddr) &&

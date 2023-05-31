@@ -20,46 +20,66 @@ describe("P2PTransport", () => {
       connectingAddress,
     });
 
-    const promises = Promise.all([
-      (async () => {
-        let found = 0;
-        for await (const msg of receiver1.listen("test")) {
-          if (msg.type === "message") {
-            tap.equal(msg.data, "hello from sender2");
-            found++;
-          }
-          if (msg.type === "open") {
-            tap.same(msg.data, { readyState: 1 });
-            found++;
-          }
-          if (found === 2) {
-            break;
-          }
+    let found = 0;
+    const prom1 = (async () => {
+      for await (const msg of receiver1.listen("test")) {
+        if (msg.type === "message") {
+          tap.equal(msg.data, "hello from sender2");
+          found++;
         }
-      })(),
-
-      (async () => {
-        let found = 0;
-        for await (const msg of receiver2.listen("test")) {
-          if (msg.type === "message") {
-            tap.equal(msg.data, "hello from sender1");
-            found++;
-          }
-          if (msg.type === "open") {
-            tap.same(msg.data, { readyState: 1 });
-            found++;
-          }
-          if (found === 2) {
-            break;
-          }
+        if (msg.type === "open") {
+          tap.same(msg.data, { readyState: 1 });
+          found++;
         }
-      })(),
-    ]);
-
+        if (found === 2) {
+          break;
+        }
+      }
+    })();
     await sender2.send("hello from sender2", "test");
-    await sender1.send("hello from sender1", "test");
 
-    await promises;
+    let found2 = 0;
+    const prom2 = (async () => {
+      for await (const msg of receiver2.listen("test2")) {
+        if (msg.type === "message") {
+          tap.equal(msg.data, "hello from sender1");
+          found2++;
+        }
+        if (msg.type === "open") {
+          tap.same(msg.data, { readyState: 1 });
+          found2++;
+        }
+        if (found2 === 2) {
+          break;
+        }
+      }
+    })();
+    await sender1.send("hello from sender1", "test2");
+    await Promise.all([prom1, prom2]);
+    tap.equal(found, 2);
+    tap.equal(found2, 2);
+
+    let found3 = 0;
+    const prom3 = (async () => {
+      for await (const msg of receiver1.listen("test3")) {
+        if (msg.type === "message") {
+          tap.equal(msg.data, "hello again from sender2");
+          found3++;
+        }
+        if (msg.type === "open") {
+          tap.same(msg.data, { readyState: 1 });
+          found3++;
+        }
+        if (found3 === 2) {
+          break;
+        }
+      }
+    })();
+
+    await sender2.send("hello again from sender2", "test3");
+
+    await prom3;
+    tap.equal(found3, 2);
 
     await node1.stop();
     await node2.stop();

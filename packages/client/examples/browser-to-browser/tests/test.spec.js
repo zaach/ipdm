@@ -10,6 +10,8 @@ import { identifyService } from "libp2p/identify";
 
 // Setup
 const test = setup();
+// Uncomment to see the browser in action
+//test.use({ headless: false });
 
 // DOM
 const connectBtn = "#connect";
@@ -84,10 +86,19 @@ test.describe("browser to browser example:", () => {
     // send the message to the peer over webRTC
     await pageTwo.fill(messageInput, message);
     await pageTwo.click(sendBtn);
-
-    // check the message was echoed back
     const outputLocator = pageTwo.locator(output);
     await expect(outputLocator).toHaveText(/Sending message/);
+    // check page one received the message
+    const outputLocatorOne = page.locator(output);
+    await expect(outputLocatorOne).toHaveText(/Received message/, {
+      timeout: 60000,
+    });
+
+    // send the message to the peer over webRTC
+    await page.fill(messageInput, message);
+    await page.click(sendBtn);
+    await expect(outputLocatorOne).toHaveText(/Sending message/);
+    // check page two received the message
     await expect(outputLocator).toHaveText(/Received message/, {
       timeout: 60000,
     });
