@@ -29,7 +29,6 @@ const PROTO = "/5edm/1.0.0";
 
 class P2PTransport {
   #libp2p: Libp2p;
-  #inChannel?: AsyncGenerator<MessageEvent, void, void>;
   #outChannel: Pushable<Uint8Array, void, void> = pushable();
   #addr?: string;
   #stream?: Stream;
@@ -109,7 +108,6 @@ class P2PTransport {
 
   async closeListener(): Promise<void> {
     await this.#libp2p.unhandle(PROTO);
-    this.#inChannel?.return();
   }
 
   async #connect() {
