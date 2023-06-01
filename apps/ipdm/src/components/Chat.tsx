@@ -74,7 +74,8 @@ function ChatHistory() {
 
   useEffect(() => {
     setupMessageListeners(eventTarget, messages, partnerUsername);
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView(false);

@@ -57,12 +57,15 @@ export async function createAppState() {
   );
 
   ChatEvent.addTypedListener(eventTarget, ChatEventType.invite, (e) => {
+    console.log("invite", e);
     joinLink.value = `${location.origin}/#${e.detail.invite}`;
   });
   ChatEvent.addTypedListener(eventTarget, ChatEventType.channel_open, () => {
+    console.log("open");
     connectionStatus.value = ConnectionStatus.connected;
   });
   ChatEvent.addTypedListener(eventTarget, ChatEventType.channel_error, (e) => {
+    console.log("error", e);
     switch (e.detail.readyState) {
       case EventSource.OPEN: // 1
         connectionStatus.value = ConnectionStatus.connected;
@@ -138,62 +141,50 @@ export function setupMessageListeners(
   const addMessage = addMessageFn(messages);
   const systemMsgId = signal(0);
 
-  ChatEvent.addTypedListener(
-    eventTarget,
-    ChatEventType.message,
-    (e: ChatEvent<ChatEventType.message>) => {
-      if (e.detail.type === MessageType.message) {
-        addMessage({
-          ...e.detail,
-          uid: `i:${e.detail.id}`,
-          seen: true,
-          time: Date.now(),
-          self: false,
-        });
-      } else if (e.detail.type === MessageType.disconnect) {
-        addMessage({
-          ...e.detail,
-          uid: `i:${e.detail.id}`,
-          msg: `${partnerUsername.value} has left the chat`,
-          system: true,
-          seen: true,
-          self: false,
-          time: Date.now(),
-        });
-      } else if (e.detail.lastSeenId) {
-        addMessage({ ...e.detail, uid: `i:${e.detail.id}` });
-      }
+  ChatEvent.addTypedListener(eventTarget, ChatEventType.message, (e) => {
+    if (e.detail.type === MessageType.message) {
+      addMessage({
+        ...e.detail,
+        uid: `i:${e.detail.id}`,
+        seen: true,
+        time: Date.now(),
+        self: false,
+      });
+    } else if (e.detail.type === MessageType.disconnect) {
+      addMessage({
+        ...e.detail,
+        uid: `i:${e.detail.id}`,
+        msg: `${partnerUsername.value} has left the chat`,
+        system: true,
+        seen: true,
+        self: false,
+        time: Date.now(),
+      });
+    } else if (e.detail.lastSeenId) {
+      addMessage({ ...e.detail, uid: `i:${e.detail.id}` });
     }
-  );
-  ChatEvent.addTypedListener(
-    eventTarget,
-    ChatEventType.queued,
-    (e: ChatEvent<ChatEventType.queued>) => {
-      if (e.detail.type === MessageType.message) {
-        addMessage({
-          ...e.detail,
-          uid: `o:${e.detail.id}`,
-          seen: false,
-          self: true,
-        });
-      }
+  });
+  ChatEvent.addTypedListener(eventTarget, ChatEventType.queued, (e) => {
+    if (e.detail.type === MessageType.message) {
+      addMessage({
+        ...e.detail,
+        uid: `o:${e.detail.id}`,
+        seen: false,
+        self: true,
+      });
     }
-  );
-  ChatEvent.addTypedListener(
-    eventTarget,
-    ChatEventType.disconnected,
-    (e: ChatEvent<ChatEventType.disconnected>) => {
-      if (e.detail.local) {
-        addMessage({
-          uid: `s:${systemMsgId.value++}`,
-          msg: "You left the chat",
-          system: true,
-          self: true,
-          time: Date.now(),
-        });
-      }
+  });
+  ChatEvent.addTypedListener(eventTarget, ChatEventType.disconnected, (e) => {
+    if (e.detail.local) {
+      addMessage({
+        uid: `s:${systemMsgId.value++}`,
+        msg: "You left the chat",
+        system: true,
+        self: true,
+        time: Date.now(),
+      });
     }
-  );
+  });
   ChatEvent.addTypedListener(eventTarget, ChatEventType.dead_session, () => {
     addMessage({
       uid: `s:${systemMsgId.value++}`,
@@ -212,18 +203,10 @@ export function setupMessageListeners(
       time: Date.now(),
     });
   });
-  ChatEvent.addTypedListener(
-    eventTarget,
-    ChatEventType.sent,
-    (e: ChatEvent<ChatEventType.sent>) => {
-      console.log("sent", e);
-    }
-  );
-  ChatEvent.addTypedListener(
-    eventTarget,
-    ChatEventType.failed,
-    (e: ChatEvent<ChatEventType.failed>) => {
-      console.log("failed", e);
-    }
-  );
+  ChatEvent.addTypedListener(eventTarget, ChatEventType.sent, (e) => {
+    console.log("sent", e);
+  });
+  ChatEvent.addTypedListener(eventTarget, ChatEventType.failed, (e) => {
+    console.log("failed", e);
+  });
 }

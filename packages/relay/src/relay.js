@@ -1,5 +1,5 @@
 import { mplex } from "@libp2p/mplex";
-import { tcp } from "@libp2p/mplex";
+import { tcp } from "@libp2p/tcp";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { createLibp2p } from "libp2p";
 import { noise } from "@chainsafe/libp2p-noise";
@@ -26,7 +26,7 @@ const server = await createLibp2p({
     tcp(),
   ],
   connectionEncryption: [noise()],
-  streamMuxers: [yamux(), mplex()],
+  streamMuxers: [mplex(), yamux()],
   services: {
     identify: identifyService(),
     relay: circuitRelayServer(),

@@ -157,12 +157,14 @@ export class EncryptedSession<MessageValueType extends ObjectValue>
 
   #openEvent(event: MessageEvent) {
     return this.#event(SessionEventType.channel_open, {
-      readyState: (event.target as EventSource)?.readyState,
+      readyState:
+        (event.target as EventSource)?.readyState ?? event.data?.readyState,
     });
   }
   #errorEvent(event: MessageEvent) {
     return this.#event(SessionEventType.channel_error, {
-      readyState: (event.target as EventSource)?.readyState,
+      readyState:
+        (event.target as EventSource)?.readyState ?? event.data?.readyState,
     });
   }
 

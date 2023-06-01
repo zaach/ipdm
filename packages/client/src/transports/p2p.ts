@@ -10,7 +10,7 @@ import { pushable, Pushable } from "it-pushable";
 import { multiaddr } from "@multiformats/multiaddr";
 import { pipe } from "it-pipe";
 import { bootstrap } from "@libp2p/bootstrap";
-import { yamux } from "@chainsafe/libp2p-yamux";
+//import { yamux } from "@chainsafe/libp2p-yamux";
 import { webRTC, webRTCDirect } from "@libp2p/webrtc";
 import { webSockets } from "@libp2p/websockets";
 import * as filters from "@libp2p/websockets/filters";
@@ -19,7 +19,7 @@ import { circuitRelayTransport } from "libp2p/circuit-relay";
 import { noise } from "@chainsafe/libp2p-noise";
 import { identifyService } from "libp2p/identify";
 
-const PROTO = "/5edm/1.0.0";
+const PROTO = "/ipdm/1.0.0";
 
 // There are two cases:
 // - initiator creates a receiver transport and sends an invite to the joiner
@@ -171,7 +171,7 @@ export class P2PTransportCreator implements TransportCreator {
         }),
       ],
       connectionEncryption: [noise()],
-      streamMuxers: [yamux(), mplex()],
+      streamMuxers: [mplex()],
       peerDiscovery: options?.bootstrapAddrs?.length
         ? [
             bootstrap({
@@ -232,7 +232,7 @@ export class P2PTransportCreator implements TransportCreator {
         webRTCDirect(),
       ],
       connectionEncryption: [noise()],
-      streamMuxers: [yamux(), mplex()],
+      streamMuxers: [mplex()],
       peerDiscovery: options?.bootstrapAddrs?.length
         ? [
             bootstrap({
