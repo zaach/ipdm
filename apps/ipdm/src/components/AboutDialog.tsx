@@ -6,13 +6,9 @@ export function AboutDialog() {
 
       <label htmlFor="about-modal" className="modal cursor-pointer">
         <label className="modal-box relative" htmlFor="">
-          <div className="relative h-8 flex place-content-center">
-            <img src="/5edm.png" className="md:w-27 md:h-9" />
+          <div className="relative h-12 flex place-content-center mb-4">
+            <img src="/ipdm-logo.png" className="md:w-12 md:h-12" />
           </div>
-          <p className="my-4 text-center text-xs light:fg-gray-500">
-            <b>E</b>phemeral, <b>E</b>dge, <b>E</b>nd-to-
-            <b>E</b>nd <b>E</b>ncrypted <b>D</b>irect <b>M</b>essaging
-          </p>
           <div className="alert p-1 pl-2">
             <div>
               <svg
@@ -26,7 +22,7 @@ export function AboutDialog() {
                   stroke-linejoin="round"
                   stroke-width="2"
                   d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                 />
+                />
               </svg>
               <span className="text-xs py-1">
                 This app is demo-tier! Use{" "}
@@ -37,19 +33,12 @@ export function AboutDialog() {
           </div>
           <div className="mt-4 text-sm">
             <p className="text-center">
-              This is a proof-of-concept app that uses{" "}
-              <Link href="https://www.rfc-editor.org/rfc/rfc9180.html">
-                HPKE
-              </Link>
-              , <Link href="https://fresh.deno.dev/">fresh</Link>, and{" "}
-              <Link href="https://deno.com/deploy">Deno Deploy</Link> to
-              facilitate end-to-end encrypted messaging between two anonymous
-              parties. No data is persisted or cached on the server so both
-              parties should be online for the best experience.
+              This is a work-in-progress decentralized secure messaging
+              platform. For more information visit the source repository.
             </p>
             <p className="text-center mt-4 inline-flex items-center gap-2 w-full justify-center">
-              <Link href="https://github.com/zaach/5edm">
-                Source code{" "}
+              <Link href="https://github.com/zaach/ipdm">
+                Source{" "}
                 <svg
                   id="i-github"
                   xmlns="http://www.w3.org/2000/svg"
@@ -65,26 +54,6 @@ export function AboutDialog() {
                   />
                 </svg>
               </Link>
-              •{" "}
-              <span>
-                By{" "}
-                <Link href="https://twitter.com/zii">
-                  zii
-                  <svg
-                    id="i-twitter"
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 64 64"
-                    width="16"
-                    height="16"
-                  >
-                    <path
-                      stroke-width="0"
-                      fill="currentColor"
-                      d="M60 16 L54 17 L58 12 L51 14 C42 4 28 15 32 24 C16 24 8 12 8 12 C8 12 2 21 12 28 L6 26 C6 32 10 36 17 38 L10 38 C14 46 21 46 21 46 C21 46 15 51 4 51 C37 67 57 37 54 21 Z"
-                    />
-                  </svg>
-                </Link>
-              </span>
             </p>
           </div>
           <div className="modal-action justify-center">
