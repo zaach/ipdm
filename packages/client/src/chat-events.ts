@@ -30,7 +30,7 @@ export interface BaseChatEvent {
 
 export class ChatEvent<
   T extends ChatEventType,
-  D extends BaseChatEvent[T] = BaseChatEvent[T],
+  D extends BaseChatEvent[T] = BaseChatEvent[T]
 > extends CustomEvent<D> {
   constructor(name: T, detail: CustomEventInit<D>) {
     super(name, detail);
@@ -39,7 +39,7 @@ export class ChatEvent<
   static addTypedListener<T extends ChatEventType>(
     eventTarget: EventTarget,
     type: T,
-    fn: (e: ChatEvent<T>) => void,
+    fn: (e: ChatEvent<T>) => void
   ) {
     eventTarget.addEventListener(type, (e) => {
       if (eventTypeGuard(e, type, ChatEvent<T>)) {
@@ -54,7 +54,7 @@ type Constructor<T> = { new (...args: any[]): T };
 function eventTypeGuard<T extends ChatEventType>(
   o: Event,
   type: T,
-  className: Constructor<ChatEvent<T>>,
+  className: Constructor<ChatEvent<T>>
 ): o is ChatEvent<T> {
   return o instanceof className && o.type === type;
 }

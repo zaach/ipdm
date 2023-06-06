@@ -68,12 +68,12 @@ export function Chat() {
 }
 
 function ChatHistory() {
-  const { chatReady, eventTarget, partnerUsername } = useContext(AppState);
+  const { chatReady, chatContext, partnerUsername } = useContext(AppState);
   const messages = useSignal<Message[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setupMessageListeners(eventTarget, messages, partnerUsername);
+    setupMessageListeners(chatContext, messages, partnerUsername);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

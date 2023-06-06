@@ -2,7 +2,6 @@ import { computed, effect, Signal, signal } from "@preact/signals";
 import { createContext } from "preact";
 import {
   ChatContext,
-  ChatEvent,
   ChatEventType,
   MessageType,
 } from "@ipdm/client";
@@ -30,10 +29,9 @@ export enum ChatStatus {
 export async function createAppState() {
   const relayAddr = import.meta.env.RELAY_ADDR;
   console.log("relayAddr", relayAddr);
-  const { eventTarget, chatContext } =
-    await ChatContext.createP2PEncryptedChatContext({
-      relayAddr,
-    });
+  const chatContext = await ChatContext.createP2PEncryptedChatContext({
+    relayAddr,
+  });
 
   const username = signal(
     (IS_BROWSER && localStorage?.getItem("username")) || ""
@@ -56,15 +54,15 @@ export async function createAppState() {
     () => chatStatus.value !== ChatStatus.uninitialized
   );
 
-  ChatEvent.addTypedListener(eventTarget, ChatEventType.invite, (e) => {
+  chatContext.on(ChatEventType.invite, (e) => {
     console.log("invite", e);
     joinLink.value = `${location.origin}/#${e.detail.invite}`;
   });
-  ChatEvent.addTypedListener(eventTarget, ChatEventType.channel_open, () => {
+  chatContext.on(ChatEventType.channel_open, () => {
     console.log("open");
     connectionStatus.value = ConnectionStatus.connected;
   });
-  ChatEvent.addTypedListener(eventTarget, ChatEventType.channel_error, (e) => {
+  chatContext.on(ChatEventType.channel_error, (e) => {
     console.log("error", e);
     switch (e.detail.readyState) {
       case EventSource.OPEN: // 1
@@ -79,14 +77,14 @@ export async function createAppState() {
         break;
     }
   });
-  ChatEvent.addTypedListener(eventTarget, ChatEventType.initiated, () => {
+  chatContext.on(ChatEventType.initiated, () => {
     chatStatus.value = ChatStatus.active;
   });
-  ChatEvent.addTypedListener(eventTarget, ChatEventType.disconnected, () => {
+  chatContext.on(ChatEventType.disconnected, () => {
     chatStatus.value = ChatStatus.disconnected;
     connectionStatus.value = ConnectionStatus.disconnected;
   });
-  ChatEvent.addTypedListener(eventTarget, ChatEventType.message, (e) => {
+  chatContext.on(ChatEventType.message, (e) => {
     chatStatus.value = ChatStatus.active;
     switch (e.detail.type) {
       case MessageType.meta:
@@ -108,7 +106,6 @@ export async function createAppState() {
     chatReady,
     joinLink,
     chatContext,
-    eventTarget,
   };
 }
 
@@ -134,14 +131,14 @@ const addMessageFn = (messages: Signal<Message[]>) => (msg: Message) => {
 };
 
 export function setupMessageListeners(
-  eventTarget: EventTarget,
+  chatContext: ChatContext,
   messages: Signal<Message[]>,
   partnerUsername: Signal<string>
 ) {
   const addMessage = addMessageFn(messages);
   const systemMsgId = signal(0);
 
-  ChatEvent.addTypedListener(eventTarget, ChatEventType.message, (e) => {
+  chatContext.on(ChatEventType.message, (e) => {
     if (e.detail.type === MessageType.message) {
       addMessage({
         ...e.detail,
@@ -164,7 +161,7 @@ export function setupMessageListeners(
       addMessage({ ...e.detail, uid: `i:${e.detail.id}` });
     }
   });
-  ChatEvent.addTypedListener(eventTarget, ChatEventType.queued, (e) => {
+  chatContext.on(ChatEventType.queued, (e) => {
     if (e.detail.type === MessageType.message) {
       addMessage({
         ...e.detail,
@@ -174,7 +171,7 @@ export function setupMessageListeners(
       });
     }
   });
-  ChatEvent.addTypedListener(eventTarget, ChatEventType.disconnected, (e) => {
+  chatContext.on(ChatEventType.disconnected, (e) => {
     if (e.detail.local) {
       addMessage({
         uid: `s:${systemMsgId.value++}`,
@@ -185,7 +182,7 @@ export function setupMessageListeners(
       });
     }
   });
-  ChatEvent.addTypedListener(eventTarget, ChatEventType.dead_session, () => {
+  chatContext.on(ChatEventType.dead_session, () => {
     addMessage({
       uid: `s:${systemMsgId.value++}`,
       msg: "The session may have died! Refresh to start a new one.",
@@ -194,7 +191,7 @@ export function setupMessageListeners(
       time: Date.now(),
     });
   });
-  ChatEvent.addTypedListener(eventTarget, ChatEventType.idle, () => {
+  chatContext.on(ChatEventType.idle, () => {
     addMessage({
       uid: `s:${systemMsgId.value++}`,
       msg: `${partnerUsername.value} may have gone offline. Refresh to start a new session.`,
@@ -203,10 +200,10 @@ export function setupMessageListeners(
       time: Date.now(),
     });
   });
-  ChatEvent.addTypedListener(eventTarget, ChatEventType.sent, (e) => {
+  chatContext.on(ChatEventType.sent, (e) => {
     console.log("sent", e);
   });
-  ChatEvent.addTypedListener(eventTarget, ChatEventType.failed, (e) => {
+  chatContext.on(ChatEventType.failed, (e) => {
     console.log("failed", e);
   });
 }

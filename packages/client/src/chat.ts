@@ -31,7 +31,7 @@ export class ChatContext<
   #partnerIsIdle = true;
 
   constructor(
-    private eventTarget: EventTarget,
+    public eventTarget: EventTarget,
     private sessionCreator: SessionCreatorType
   ) {}
 
@@ -50,7 +50,7 @@ export class ChatContext<
       eventTarget,
       new EncryptedSessionWithReplayCreator(new HttpTransportCreator(config))
     );
-    return { eventTarget, chatContext };
+    return chatContext;
   }
 
   static async createP2PEncryptedChatContext({
@@ -68,17 +68,18 @@ export class ChatContext<
       eventTarget,
       new EncryptedSessionWithReplayCreator(transportCreator, identity)
     );
-    return { eventTarget, chatContext };
+    return chatContext;
   }
 
   protected emit<T extends keyof BaseChatEvent, D extends BaseChatEvent[T]>(
     type: T,
     detail: D
   ): void {
-    if (!this.eventTarget) {
-      return;
-    }
     this.eventTarget.dispatchEvent(new ChatEvent<T, D>(type, { detail }));
+  }
+
+  on<T extends ChatEventType>(type: T, fn: (e: ChatEvent<T>) => void) {
+    ChatEvent.addTypedListener(this.eventTarget, type, fn);
   }
 
   async joinWithInvite(invite: string) {
