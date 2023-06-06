@@ -65,12 +65,17 @@ describe("P2PTransport", () => {
         if (msg.type === "message") {
           tap.equal(msg.data, "hello again from sender2");
           found3++;
+          await sender2.close();
         }
         if (msg.type === "open") {
           tap.same(msg.data, { readyState: 1 });
           found3++;
         }
-        if (found3 === 2) {
+        if (msg.type === "error") {
+          tap.same(msg.data, { readyState: 2 });
+          found3++;
+        }
+        if (found3 === 3) {
           break;
         }
       }
@@ -79,7 +84,7 @@ describe("P2PTransport", () => {
     await sender2.send("hello again from sender2", "test3");
 
     await prom3;
-    tap.equal(found3, 2);
+    tap.equal(found3, 3);
 
     await node1.stop();
     await node2.stop();

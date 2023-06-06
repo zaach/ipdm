@@ -44,22 +44,16 @@ class P2PTransport {
 
     libp2p.addEventListener("connection:open", (event) => {
       console.log("connection:open", event.detail);
-      this.#checkConnections();
     });
     libp2p.addEventListener("connection:close", (event) => {
       console.log("connection:close", event.detail);
-      this.#checkConnections();
     });
-  }
-
-  #checkConnections() {
-    const connections = this.#libp2p.getConnections();
-    console.log("connections", connections);
   }
 
   #newSource(): AsyncGenerator<MessageEvent<any>, void, void> {
     const self = this;
     let started = false;
+    let ended = false;
     return {
       async next(): Promise<IteratorResult<MessageEvent<any>>> {
         const stream = await self.#connect();
@@ -70,10 +64,17 @@ class P2PTransport {
             value: new MessageEvent("open", { data: { readyState: 1 } }),
           };
         }
-        const next = await stream.source.next();
-        if (next.done) {
+        if (ended) {
           return {
             done: true,
+            value: null,
+          };
+        }
+        const next = await stream.source.next();
+        if (next.done) {
+          ended = true;
+          return {
+            done: false,
             value: new MessageEvent("error", { data: { readyState: 2 } }),
           };
         }
@@ -107,6 +108,7 @@ class P2PTransport {
   }
 
   async closeListener(): Promise<void> {
+    this.#stream?.close();
     await this.#libp2p.unhandle(PROTO);
   }
 
@@ -140,6 +142,7 @@ class P2PTransport {
   }
 
   async closeSender() {
+    this.#stream?.close();
     this.#outChannel.end();
   }
 }

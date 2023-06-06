@@ -15,6 +15,10 @@ async function createNode({ relayAddr, invite }) {
     console.log("channel_open", event);
     appendOutput(`Connected to '${relayAddr}'`);
   });
+  chat.on(ChatEventType.channel_error, (event) => {
+    console.log("channel_error", event);
+    appendOutput(`Disconnected from peer`);
+  });
   chat.on(ChatEventType.invite, (event) => {
     console.log("invite", event);
     appendOutput(`Got invite ${event.detail.invite}`);
