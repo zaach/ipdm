@@ -4,7 +4,7 @@ import { EventIterator } from "./event-iterator";
 tap.mochaGlobals();
 
 describe("EventIterator", () => {
-  it("event iterator", async function () {
+  it("event iterator", async () => {
     const et = new EventTarget();
     const test = new EventIterator(et, ["open", "message"]);
 

@@ -7,10 +7,12 @@ export class EventStreamSource {
     private eventNames: string[],
     private options?: {
       onCancel?: (et: EventTarget) => void;
+      // eslint-disable-next-line no-undef
       onError?: (c: ReadableStreamDefaultController, e: Event) => void;
-    },
+    }
   ) {}
 
+  // eslint-disable-next-line no-undef
   start(controller: ReadableStreamDefaultController) {
     for (const name of this.eventNames) {
       this.#handlers[name] = (event: Event) => {
@@ -47,10 +49,9 @@ export class EventStreamSource {
 // https://github.com/whatwg/streams/pull/980#issuecomment-1167194347
 // https://web.dev/streams/#asynchronous-iteration
 export function streamAsyncIterator(
-  stream: ReadableStream,
-  // deno-lint-ignore no-explicit-any
+  stream: ReadableStream
 ): AsyncGenerator<any, void, undefined> {
-  return async function* () {
+  return (async function* () {
     const reader = stream.getReader();
     try {
       while (true) {
@@ -63,13 +64,12 @@ export function streamAsyncIterator(
     } finally {
       reader.releaseLock();
     }
-  }();
+  })();
 }
 
 export class EventIterator {
   #source: EventStreamSource;
   #stream: ReadableStream;
-  // deno-lint-ignore no-explicit-any
   #iter?: AsyncGenerator<any, void, undefined>;
 
   constructor(
@@ -77,14 +77,11 @@ export class EventIterator {
     eventNames: string[],
     options?: {
       onCancel?: (et: EventTarget) => void;
+      // eslint-disable-next-line no-undef
       onError?: (c: ReadableStreamDefaultController, e: Event) => void;
-    },
+    }
   ) {
-    this.#source = new EventStreamSource(
-      this.eventTarget,
-      eventNames,
-      options,
-    );
+    this.#source = new EventStreamSource(this.eventTarget, eventNames, options);
     this.#stream = new ReadableStream(this.#source);
   }
 

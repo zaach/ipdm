@@ -7,9 +7,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "lint": "TIMING=1 eslint \"**/*.{ts,tsx,js,jsx}\" --fix",
+    "lint": "TIMING=1 eslint \"**/*.{ts,js}\" --fix",
     "clean": "rm -rf ./dist && rm -rf .turbo",
-    "test": "tap --no-coverage --node-arg=--loader=tsx src/**/*.test.ts src/*.test.ts"
+    "test": "pnpm test:src && pnpm test:examples",
+    "test:src": "tap --no-coverage --node-arg=--loader=tsx src/**/*.test.ts src/*.test.ts",
+    "test:examples": "cd examples/browser-to-browser && npm i && npm run test"
   },
   "sideEffects": false,
   "type": "module",

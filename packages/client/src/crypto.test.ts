@@ -13,7 +13,7 @@ const te = new TextEncoder();
 const td = new TextDecoder();
 
 describe("crypto", () => {
-  it("encrypt/decrypt", async function () {
+  it("encrypt/decrypt", async () => {
     // setup
     const initiator = new InitiatorCryptoContext();
     const { serializedPublicKey: ipk } = await initiator.init();

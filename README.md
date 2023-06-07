@@ -36,7 +36,7 @@ Packages:
 
 ```bash
 pnpm install
-turbo build
+pnpm build
 ```
 
 ## Dev

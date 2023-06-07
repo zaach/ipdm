@@ -32,7 +32,8 @@ export class ChatEvent<
   T extends ChatEventType,
   D extends BaseChatEvent[T] = BaseChatEvent[T]
 > extends CustomEvent<D> {
-  constructor(name: T, detail: CustomEventInit<D>) {
+  // eslint-disable no-useless-constructor
+  constructor(name: T, detail: CustomEventInit<D>) { // eslint-disable-line
     super(name, detail);
   }
 
@@ -49,7 +50,6 @@ export class ChatEvent<
   }
 }
 
-// deno-lint-ignore no-explicit-any
 type Constructor<T> = { new (...args: any[]): T };
 function eventTypeGuard<T extends ChatEventType>(
   o: Event,

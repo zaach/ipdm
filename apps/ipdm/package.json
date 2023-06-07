@@ -8,10 +8,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "relay": "relay",
-    "lint": "eslint --ext .ts,tsx --ignore-path .gitignore .",
-    "test:firefox": "npm run build && playwright test --browser=firefox src/tests",
-    "test:chrome": "npm run build && playwright test src/tests",
-    "test": "npm run build && test-browser-example src/tests"
+    "lint": "eslint --ext .ts,tsx --ignore-path .gitignore ."
   },
   "husky": {
     "hooks": {
