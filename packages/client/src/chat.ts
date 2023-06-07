@@ -1,3 +1,4 @@
+import { InternalFormat, InternalFormatJson } from "./encoding";
 import {
   BaseChatEvent,
   BaseMessages,
@@ -20,9 +21,9 @@ import { DecentralizedIdentity } from "./identity";
 import { HttpTransportCreator, P2PTransportCreator } from "./transports";
 
 export class ChatContext<
-  SessionCreatorType extends SessionCreator<MessageValue> = SessionCreator<MessageValue>
+  SessionCreatorType extends SessionCreator = SessionCreator
 > {
-  protected session?: ConnectedSession<MessageValue, Session<MessageValue>>;
+  protected session?: ConnectedSession<Session>;
   #username?: string;
   #sendCount = 0;
   #lastSendTime = 0;
@@ -32,7 +33,8 @@ export class ChatContext<
 
   constructor(
     public eventTarget: EventTarget,
-    private sessionCreator: SessionCreatorType
+    private sessionCreator: SessionCreatorType,
+    protected format: InternalFormat = new InternalFormatJson()
   ) {}
 
   static createEncryptedChatContext({
@@ -94,7 +96,7 @@ export class ChatContext<
     };
     this.session = await this.sessionCreator.joinWithInvite(
       invite,
-      joinMessage
+      this.format.encode(joinMessage)
     );
     this.#listen();
     this.emit(ChatEventType.initiated, {});
@@ -112,7 +114,7 @@ export class ChatContext<
     this.emit(ChatEventType.initiated, {});
     await this.#send(MessageType.meta, { name: this.#username || "🤡" });
   }
-  #handleSessionJoinEvent(evt: SessionEventValues<MessageValue>) {
+  #handleSessionJoinEvent(evt: SessionEventValues) {
     switch (evt.type) {
       case SessionEventType.channel_error:
         this.emit(ChatEventType.channel_error, evt.detail);
@@ -160,7 +162,7 @@ export class ChatContext<
   }
 
   protected async sessionSend(out: MessageValue) {
-    return await this.session!.send(out);
+    return await this.session!.send(this.format.encode(out));
   }
 
   async #send<T extends keyof BaseMessages, B extends BaseMessages[T]>(
@@ -196,7 +198,22 @@ export class ChatContext<
     }
   }
 
-  async #handleMessage(msg: MessageValue) {
+  protected decodePlaintext(plaintext: ArrayBuffer): MessageValue {
+    const data = this.format.decode(plaintext);
+    if (!this.#isMsg(data)) {
+      throw new Error("bad message");
+    }
+    return data;
+  }
+  #isMsg(data: any): data is MessageValue {
+    if (!("id" in data) || !("type" in data) || !("lastSeenId" in data)) {
+      return false;
+    }
+    return true;
+  }
+
+  async #handleMessage(plaintext: ArrayBuffer) {
+    const msg = this.decodePlaintext(plaintext);
     if (msg.id > this.#lastSeenId) this.#lastSeenId = msg.id;
     this.#lastSeenTime = Date.now();
     if (this.#partnerIsIdle) {
@@ -242,13 +259,8 @@ export class ChatContext<
   }
 }
 
-export class DurableChatContext extends ChatContext<
-  EncryptedSessionWithReplayCreator<MessageValue>
-> {
-  protected declare session?: ConnectedSession<
-    MessageValue,
-    SessionWithReplay<MessageValue>
-  >;
+export class DurableChatContext extends ChatContext<EncryptedSessionWithReplayCreator> {
+  protected declare session?: ConnectedSession<SessionWithReplay>;
   #lastSentId = 0;
   #lastClearId = 0;
   #partnerLastSeenId = 0;
@@ -257,7 +269,7 @@ export class DurableChatContext extends ChatContext<
   #unconfirmedMessages: Map<number, number> = new Map();
 
   protected async sessionSend(out: MessageValue) {
-    const result = await this.session!.send(out);
+    const result = await this.session!.send(this.format.encode(out));
     this.#unconfirmedMessages.set(out.id, result.requestId);
     this.#lastSentId = out.id;
     return result;
@@ -270,9 +282,10 @@ export class DurableChatContext extends ChatContext<
     this.#lastIdInSync = this.#partnerLastSeenId; // id of the last good message they saw from us
     for await (const evt of this.session!.listen()) {
       switch (evt.type) {
-        case SessionEventType.message:
+        case SessionEventType.message: {
+          const msg = this.decodePlaintext(evt.detail);
           openErrors = 0;
-          this.#partnerLastSeenId = evt.detail.lastSeenId;
+          this.#partnerLastSeenId = msg.lastSeenId;
           await this.#markMessagesConfirmedOrResend();
           // They're all caught up with our messages
           if (
@@ -282,6 +295,7 @@ export class DurableChatContext extends ChatContext<
             this.#outOfSync = false;
           }
           break;
+        }
         case SessionEventType.open_error:
           this.#lastIdInSync = this.#partnerLastSeenId;
           openErrors++;

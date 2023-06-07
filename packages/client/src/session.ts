@@ -16,7 +16,6 @@ import {
   TransportCreator,
   TransportParams,
 } from "./transports";
-
 import { DecentralizedIdentity, Identity } from "./identity";
 
 export enum SessionEventType {
@@ -27,60 +26,45 @@ export enum SessionEventType {
   handshake = "handshake",
 }
 
-type ObjectValue = Record<string, unknown>;
-
-interface BaseSessionEvent<MessageValueType> {
+interface BaseSessionEvent {
   [SessionEventType.channel_open]: { readyState: number };
   [SessionEventType.channel_error]: { readyState: number };
-  [SessionEventType.message]: MessageValueType;
-  [SessionEventType.handshake]: MessageValueType;
+  [SessionEventType.message]: ArrayBuffer;
+  [SessionEventType.handshake]: ArrayBuffer;
   [SessionEventType.open_error]: Record<never, never>;
 }
 
-interface SessionEvent<
-  MessageValueType,
-  D extends keyof BaseSessionEvent<MessageValueType>
-> {
+interface SessionEvent<D extends keyof BaseSessionEvent> {
   type: D;
-  detail: BaseSessionEvent<MessageValueType>[D];
+  detail: BaseSessionEvent[D];
 }
 
-type SessionEvents<MessageValueType> = {
-  [K in keyof BaseSessionEvent<MessageValueType>]: SessionEvent<
-    MessageValueType,
-    K
-  >;
+type SessionEvents = {
+  [K in keyof BaseSessionEvent]: SessionEvent<K>;
 };
-export type SessionEventValues<MessageValueType> =
-  SessionEvents<MessageValueType>[keyof SessionEvents<MessageValueType>];
+export type SessionEventValues = SessionEvents[keyof SessionEvents];
 
-export interface Session<MessageValueType extends ObjectValue = ObjectValue> {
+export interface Session {
   sessionId?: string;
   toSessionId?: string;
 
-  listen(): AsyncGenerator<SessionEventValues<MessageValueType>, void, void>;
-  send: (
-    body: MessageValueType
-  ) => Promise<SendResponse & { requestId: number }>;
+  listen(): AsyncGenerator<SessionEventValues, void, void>;
+  send: (body: ArrayBuffer) => Promise<SendResponse & { requestId: number }>;
   disconnect(): Promise<void>;
 }
 
-export interface SessionWithReplay<
-  MessageValueType extends ObjectValue = ObjectValue
-> extends Session<MessageValueType> {
+export interface SessionWithReplay extends Session {
   clearCache(requestIds: number[]): void;
   resendFromCache(requestIds: number[]): Promise<void>;
 }
 
-export type ConnectedSession<
-  MessageValueType extends ObjectValue = ObjectValue,
-  SessionType extends Session<MessageValueType> = Session<MessageValueType>
-> = Omit<SessionType, "sessionId" | "toSessionId"> &
-  Required<Pick<Session<MessageValueType>, "sessionId" | "toSessionId">>;
+export type ConnectedSession<SessionType extends Session = Session> = Omit<
+  SessionType,
+  "sessionId" | "toSessionId"
+> &
+  Required<Pick<Session, "sessionId" | "toSessionId">>;
 
-export class EncryptedSession<MessageValueType extends ObjectValue>
-  implements Session<MessageValueType>
-{
+export class EncryptedSession implements Session {
   sessionId?: string;
   toSessionId?: string;
 
@@ -97,11 +81,7 @@ export class EncryptedSession<MessageValueType extends ObjectValue>
     await this.receiver.close();
   }
 
-  async *waitForJoin(): AsyncGenerator<
-    SessionEventValues<MessageValueType>,
-    void,
-    void
-  > {
+  async *waitForJoin(): AsyncGenerator<SessionEventValues, void, void> {
     if (
       !(this.cryptoContext instanceof InitiatorCryptoContext) ||
       !this.cryptoContext.handshakeChannelId
@@ -119,10 +99,9 @@ export class EncryptedSession<MessageValueType extends ObjectValue>
           const decoded = this.wireFormat.decodeHandshakeEnvelope(event.data);
           const { plaintext, toSessionId, sessionId } =
             await this.cryptoContext.handleJoin(decoded);
-          const message = this.format.decode(plaintext) as MessageValueType;
           this.sessionId = encodeUrlParam(sessionId);
           this.toSessionId = encodeUrlParam(toSessionId);
-          yield this.#event(SessionEventType.handshake, message);
+          yield this.#event(SessionEventType.handshake, plaintext);
           return;
         } catch (e) {
           console.warn(event, e);
@@ -131,12 +110,11 @@ export class EncryptedSession<MessageValueType extends ObjectValue>
     }
   }
 
-  async join(pk: Uint8Array, initialMessage: MessageValueType) {
+  async join(pk: Uint8Array, plaintext: ArrayBuffer) {
     if (!(this.cryptoContext instanceof JoinerCryptoContext)) {
       throw new Error("Must be the joining party to join");
     }
 
-    const plaintext = this.format.encode(initialMessage);
     const { envelope, toChannelId, sessionId, toSessionId } =
       await this.cryptoContext.initSender(pk, plaintext);
     const encoded = this.wireFormat.encodeHandshakeEnvelope(envelope);
@@ -145,10 +123,10 @@ export class EncryptedSession<MessageValueType extends ObjectValue>
     await this.sender.send(encoded, encodeUrlParam(toChannelId));
   }
 
-  #event<T extends keyof BaseSessionEvent<MessageValueType>>(
+  #event<T extends keyof BaseSessionEvent>(
     type: T,
-    detail: BaseSessionEvent<MessageValueType>[T]
-  ): SessionEvent<MessageValueType, T> {
+    detail: BaseSessionEvent[T]
+  ): SessionEvent<T> {
     return {
       type,
       detail,
@@ -168,11 +146,7 @@ export class EncryptedSession<MessageValueType extends ObjectValue>
     });
   }
 
-  async *listen(): AsyncGenerator<
-    SessionEventValues<MessageValueType>,
-    void,
-    void
-  > {
+  async *listen(): AsyncGenerator<SessionEventValues, void, void> {
     if (!this.sessionId) {
       throw this.notInitializedError();
     }
@@ -188,8 +162,7 @@ export class EncryptedSession<MessageValueType extends ObjectValue>
             decoded.payload,
             decoded.header
           );
-          const detail = this.format.decode(plaintext) as MessageValueType;
-          yield this.#event(SessionEventType.message, detail);
+          yield this.#event(SessionEventType.message, plaintext);
         } catch (e) {
           console.warn(event, e);
           yield this.#event(SessionEventType.open_error, {});
@@ -205,13 +178,12 @@ export class EncryptedSession<MessageValueType extends ObjectValue>
     return { ...result, requestId };
   }
 
-  async send<T extends MessageValueType>(
-    msg: T
+  async send(
+    plaintext: ArrayBuffer
   ): Promise<SendResponse & { requestId: number }> {
     if (!this.toSessionId) {
       throw this.notInitializedError();
     }
-    const plaintext = this.format.encode(msg);
     const encrypted = await this.cryptoContext.seal(plaintext);
     const encoded = this.wireFormat.encodeEnvelope(encrypted);
     return this.senderSend(encoded);
@@ -223,29 +195,25 @@ export class EncryptedSession<MessageValueType extends ObjectValue>
 }
 
 export interface SessionCreator<
-  MessageValueType extends ObjectValue = ObjectValue,
-  BaseSessionType extends Session<MessageValueType> = Session<MessageValueType>,
-  SessionType = ConnectedSession<MessageValueType, BaseSessionType>
+  BaseSessionType extends Session = Session,
+  SessionType = ConnectedSession<BaseSessionType>
 > {
-  waitForJoin(
-    handleEvent?: (e: SessionEventValues<MessageValueType>) => void
-  ): Promise<{
+  waitForJoin(handleEvent?: (e: SessionEventValues) => void): Promise<{
     invite: string;
     joinPromise: Promise<{
-      joinMessage: MessageValueType;
+      joinMessage: ArrayBuffer;
       session: SessionType;
     }>;
   }>;
   joinWithInvite(
     invite: string,
-    joinMessage: MessageValueType
-  ): Promise<ConnectedSession<MessageValueType, BaseSessionType>>;
+    joinMessage: ArrayBuffer
+  ): Promise<ConnectedSession<BaseSessionType>>;
 }
 
 export class EncryptedSessionCreator<
-  MessageValueType extends ObjectValue = ObjectValue,
-  BaseSessionType extends Session<MessageValueType> = EncryptedSession<MessageValueType>
-> implements SessionCreator<MessageValueType, BaseSessionType>
+  BaseSessionType extends Session = EncryptedSession
+> implements SessionCreator<BaseSessionType>
 {
   constructor(
     protected readonly transportCreator: TransportCreator = new HttpTransportCreator(),
@@ -256,7 +224,7 @@ export class EncryptedSessionCreator<
     initiator: InitiatorCryptoContext,
     params?: TransportParams
   ) {
-    return new EncryptedSession<MessageValueType>(
+    return new EncryptedSession(
       initiator,
       await this.transportCreator.createReceiverTransport(params),
       await this.transportCreator.createSenderTransport(params)
@@ -266,7 +234,7 @@ export class EncryptedSessionCreator<
     joiner: JoinerCryptoContext,
     params?: TransportParams
   ) {
-    return new EncryptedSession<MessageValueType>(
+    return new EncryptedSession(
       joiner,
       await this.transportCreator.createReceiverTransport(params),
       await this.transportCreator.createSenderTransport(params)
@@ -281,12 +249,12 @@ export class EncryptedSessionCreator<
   }
 
   public async waitForJoin(
-    handleEvent?: (e: SessionEventValues<MessageValueType>) => void
+    handleEvent?: (e: SessionEventValues) => void
   ): Promise<{
     invite: string;
     joinPromise: Promise<{
-      joinMessage: MessageValueType;
-      session: ConnectedSession<MessageValueType, BaseSessionType>;
+      joinMessage: ArrayBuffer;
+      session: ConnectedSession<BaseSessionType>;
     }>;
   }> {
     const { initiator, invite } = await this.#createInvite();
@@ -295,7 +263,7 @@ export class EncryptedSessionCreator<
       invite,
       // eslint-disable-next-line no-async-promise-executor
       joinPromise: new Promise(async (resolve, _reject) => {
-        let result: MessageValueType;
+        let result: ArrayBuffer;
         for await (const evt of session.waitForJoin()) {
           if (evt.type === SessionEventType.handshake) {
             result = evt.detail;
@@ -315,8 +283,8 @@ export class EncryptedSessionCreator<
 
   public async joinWithInvite(
     invite: string,
-    joinMessage: MessageValueType
-  ): Promise<ConnectedSession<MessageValueType, BaseSessionType>> {
+    joinMessage: ArrayBuffer
+  ): Promise<ConnectedSession<BaseSessionType>> {
     const joiner = new JoinerCryptoContext();
     const data = this.identity.decodeInvite(invite);
     const joinerSession = await this.createJoinerSession(
@@ -332,16 +300,14 @@ export class EncryptedSessionCreator<
   }
 
   #isSessionConnected(
-    session: Session<MessageValueType>
-  ): session is ConnectedSession<MessageValueType, BaseSessionType> {
+    session: Session
+  ): session is ConnectedSession<BaseSessionType> {
     if (!("sessionId" in session) || !("toSessionId" in session)) {
       return false;
     }
     return true;
   }
-  #asConnectedSession(
-    session: Session<MessageValueType>
-  ): ConnectedSession<MessageValueType, BaseSessionType> {
+  #asConnectedSession(session: Session): ConnectedSession<BaseSessionType> {
     if (!this.#isSessionConnected(session)) {
       throw new Error("bad session");
     }
@@ -349,9 +315,7 @@ export class EncryptedSessionCreator<
   }
 }
 
-export class EncryptedSessionWithReplay<
-  MessageValueType extends ObjectValue
-> extends EncryptedSession<MessageValueType> {
+export class EncryptedSessionWithReplay extends EncryptedSession {
   #requestCache: Map<number, string> = new Map();
 
   protected async senderSend(encoded: string) {
@@ -379,14 +343,13 @@ export class EncryptedSessionWithReplay<
 }
 
 export class EncryptedSessionWithReplayCreator<
-  MessageValueType extends ObjectValue = ObjectValue,
-  BaseSessionType extends EncryptedSessionWithReplay<MessageValueType> = EncryptedSessionWithReplay<MessageValueType>
-> extends EncryptedSessionCreator<MessageValueType, BaseSessionType> {
+  BaseSessionType extends EncryptedSessionWithReplay = EncryptedSessionWithReplay
+> extends EncryptedSessionCreator<BaseSessionType> {
   protected async createInitiatorSession(
     initiator: InitiatorCryptoContext,
     params?: TransportParams
   ) {
-    return new EncryptedSessionWithReplay<MessageValueType>(
+    return new EncryptedSessionWithReplay(
       initiator,
       await this.transportCreator.createReceiverTransport(params),
       await this.transportCreator.createSenderTransport(params)
@@ -396,7 +359,7 @@ export class EncryptedSessionWithReplayCreator<
     joiner: JoinerCryptoContext,
     params?: TransportParams
   ) {
-    return new EncryptedSessionWithReplay<MessageValueType>(
+    return new EncryptedSessionWithReplay(
       joiner,
       await this.transportCreator.createReceiverTransport(params),
       await this.transportCreator.createSenderTransport(params)
