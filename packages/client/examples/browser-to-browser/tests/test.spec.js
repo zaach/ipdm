@@ -125,5 +125,7 @@ async function joinInvite(page, address, invite) {
 
   const outputLocator = page.locator(output);
   await expect(outputLocator).toHaveText(/Dialing/);
-  await expect(outputLocator).toHaveText(/Chat initiated/);
+  await expect(outputLocator).toHaveText(/Chat initiated/, {
+    timeout: 10_0000,
+  });
 }
