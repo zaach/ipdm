@@ -6,7 +6,7 @@ tap.mochaGlobals();
 const te = new TextEncoder();
 
 describe("encoding", () => {
-  it("encode/decode", function () {
+  it("encode/decode", () => {
     const identity = new DecentralizedIdentity({ addr: "foo" });
 
     const invite = identity.encodeInvite({ iss: te.encode("bar") });

@@ -73,7 +73,7 @@ function msg(detail: Record<string, unknown>): {
 }
 
 describe("EncryptedSession", () => {
-  it("sessionCreator", async function () {
+  it("sessionCreator", async () => {
     const joinerSendEvents = new EventTarget();
     const initiatorSendEvents = new EventTarget();
     const creator = new TestEncryptedSessionCreator(

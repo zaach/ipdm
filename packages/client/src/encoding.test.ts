@@ -9,7 +9,7 @@ const encoder = new Base64EnvelopeEncoding();
 const tuple = <T extends [any] | any[]>(args: T): T => args;
 
 describe("encoding", () => {
-  it("encode/decode", function () {
+  it("encode/decode", () => {
     const header = te.encode("head data");
     const payload = te.encode("payload data");
 
@@ -25,7 +25,7 @@ describe("encoding", () => {
     tap.strictSame(reconstructed, envelope);
   });
 
-  it("encode/decode handshake", function () {
+  it("encode/decode handshake", () => {
     const header = tuple([
       te.encode("header data"),
       te.encode("header data 2"),

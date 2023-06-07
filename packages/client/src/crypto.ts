@@ -150,7 +150,7 @@ export class InitiatorCryptoContext extends Encrypter {
     const recipient = await this.suite.createRecipientContext({
       recipientKey: this.#sk,
       enc: senderInitContext,
-      senderPublicKey: senderPublicKey,
+      senderPublicKey,
     });
 
     const keySeed = await recipient.export(EXPORT_LABEL_KEY, 32);

@@ -10,7 +10,7 @@ import { pushable, Pushable } from "it-pushable";
 import { multiaddr } from "@multiformats/multiaddr";
 import { pipe } from "it-pipe";
 import { bootstrap } from "@libp2p/bootstrap";
-//import { yamux } from "@chainsafe/libp2p-yamux";
+import { yamux } from "@chainsafe/libp2p-yamux";
 import { webRTC, webRTCDirect } from "@libp2p/webrtc";
 import { webSockets } from "@libp2p/websockets";
 import * as filters from "@libp2p/websockets/filters";
@@ -174,7 +174,7 @@ export class P2PTransportCreator implements TransportCreator {
         }),
       ],
       connectionEncryption: [noise()],
-      streamMuxers: [mplex()],
+      streamMuxers: [mplex(), yamux()],
       peerDiscovery: options?.bootstrapAddrs?.length
         ? [
             bootstrap({
@@ -200,7 +200,7 @@ export class P2PTransportCreator implements TransportCreator {
       },
     });
     // wait until peer update shows the webrtc relay address is ready
-    return new Promise(async (resolve) => {
+    return new Promise((resolve) => {
       node.addEventListener("self:peer:update", (_event) => {
         for (const addr of node.getMultiaddrs()) {
           const connectingAddr = addr.toString();
@@ -212,7 +212,7 @@ export class P2PTransportCreator implements TransportCreator {
           }
         }
       });
-      await node.dial(multiaddr(options.relayAddr));
+      node.dial(multiaddr(options.relayAddr));
     });
   }
 
@@ -235,7 +235,7 @@ export class P2PTransportCreator implements TransportCreator {
         webRTCDirect(),
       ],
       connectionEncryption: [noise()],
-      streamMuxers: [mplex()],
+      streamMuxers: [mplex(), yamux()],
       peerDiscovery: options?.bootstrapAddrs?.length
         ? [
             bootstrap({

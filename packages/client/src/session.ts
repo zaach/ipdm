@@ -290,10 +290,11 @@ export class EncryptedSessionCreator<
     }>;
   }> {
     const { initiator, invite } = await this.#createInvite();
+    const session = await this.createInitiatorSession(initiator);
     return {
       invite,
+      // eslint-disable-next-line no-async-promise-executor
       joinPromise: new Promise(async (resolve, _reject) => {
-        const session = await this.createInitiatorSession(initiator);
         let result: MessageValueType;
         for await (const evt of session.waitForJoin()) {
           if (evt.type === SessionEventType.handshake) {
