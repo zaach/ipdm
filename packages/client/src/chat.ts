@@ -282,7 +282,7 @@ export class DurableChatContext extends ChatContext<EncryptedSessionWithReplayCr
     this.#lastIdInSync = this.#partnerLastSeenId; // id of the last good message they saw from us
     for await (const evt of this.session!.listen()) {
       switch (evt.type) {
-        case SessionEventType.message:
+        case SessionEventType.message: {
           const msg = this.decodePlaintext(evt.detail);
           openErrors = 0;
           this.#partnerLastSeenId = msg.lastSeenId;
@@ -295,6 +295,7 @@ export class DurableChatContext extends ChatContext<EncryptedSessionWithReplayCr
             this.#outOfSync = false;
           }
           break;
+        }
         case SessionEventType.open_error:
           this.#lastIdInSync = this.#partnerLastSeenId;
           openErrors++;
