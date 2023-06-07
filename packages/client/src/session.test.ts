@@ -7,11 +7,16 @@ import {
 } from "./session";
 import { ReceiverTransport, SenderTransport, SendResponse } from "./transports";
 import { EventIterator } from "./event-iterator";
+import { InternalFormatJson } from "./encoding";
 
 tap.mochaGlobals();
 
-function assertEquals(a: any, b: any) {
-  tap.strictSame(a, b);
+const format = new InternalFormatJson();
+
+function assertEqualsBuffer(a: any, b: any) {
+  tap.strictSame(a.type, b.type);
+  tap.ok(a.detail instanceof ArrayBuffer);
+  tap.strictSame(format.decode(a.detail), b.detail);
 }
 
 class TestReceiverTransport implements ReceiverTransport {
@@ -85,35 +90,38 @@ describe("EncryptedSession", () => {
 
     (async function () {
       const { joinMessage, session } = await joinPromise;
-      assertEquals(joinMessage, { nice: "v nice" });
+      tap.strictSame(format.decode(joinMessage), { nice: "v nice" });
 
-      await session.send({ ello: "poppet" });
-      await session.send({ ello: "guvnah" });
+      await session.send(format.encode({ ello: "poppet" }));
+      await session.send(format.encode({ ello: "guvnah" }));
 
       const iReceiver = session.listen();
 
       await iReceiver
         .next()
-        .then((e) => assertEquals(e.value, msg({ req: "res" })));
+        .then((e) => assertEqualsBuffer(e.value, msg({ req: "res" })));
       await iReceiver
         .next()
-        .then((e) => assertEquals(e.value, msg({ send: "recv" })));
+        .then((e) => assertEqualsBuffer(e.value, msg({ send: "recv" })));
     })();
 
     await creator
-      .joinWithInvite(invite, {
-        nice: "v nice",
-      })
+      .joinWithInvite(
+        invite,
+        format.encode({
+          nice: "v nice",
+        })
+      )
       .then(async (joinerSession) => {
         const jReceiver = joinerSession.listen();
         await jReceiver
           .next()
-          .then((e) => assertEquals(e.value, msg({ ello: "poppet" })));
+          .then((e) => assertEqualsBuffer(e.value, msg({ ello: "poppet" })));
         await jReceiver
           .next()
-          .then((e) => assertEquals(e.value, msg({ ello: "guvnah" })));
-        await joinerSession.send({ req: "res" });
-        await joinerSession.send({ send: "recv" });
+          .then((e) => assertEqualsBuffer(e.value, msg({ ello: "guvnah" })));
+        await joinerSession.send(format.encode({ req: "res" }));
+        await joinerSession.send(format.encode({ send: "recv" }));
       });
   });
 });
