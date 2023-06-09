@@ -1,11 +1,8 @@
 import { computed, effect, Signal, signal } from "@preact/signals";
 import { createContext } from "preact";
-import {
-  ChatContext,
-  ChatEventType,
-  MessageType,
-} from "@ipdm/client";
+import { ChatContext, ChatEventType, MessageType } from "@ipdm/client";
 import { Message } from "./types";
+import { getRelayAddr } from "./locationParams";
 
 const IS_BROWSER = typeof window !== "undefined";
 
@@ -27,7 +24,7 @@ export enum ChatStatus {
 }
 
 export async function createAppState() {
-  const relayAddr = import.meta.env.RELAY_ADDR;
+  const relayAddr = getRelayAddr(location.hash) ?? import.meta.env.RELAY_ADDR;
   console.log("relayAddr", relayAddr);
   const chatContext = await ChatContext.createP2PEncryptedChatContext({
     relayAddr,
