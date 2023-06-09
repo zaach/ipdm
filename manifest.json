@@ -1,0 +1,12 @@
+{
+  "name": "IPDM",
+  "short_name": "IPDM",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "ipdm-logo.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    }
+  ]
+}
