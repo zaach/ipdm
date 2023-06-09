@@ -8,6 +8,7 @@ import {
   createAppState,
   setupMessageListeners,
 } from "../lib/state";
+import { getInvite } from "../lib/locationParams";
 
 import { Message, DisplayMessage } from "../lib/types";
 import { ShareLink } from "../components/ShareLink";
@@ -45,7 +46,7 @@ export function Chat() {
   };
 
   effect(() => {
-    const invite = location.hash?.slice(1);
+    const invite = getInvite(location.hash);
     if (invite) {
       chatContext.joinWithInvite(invite);
     } else {
