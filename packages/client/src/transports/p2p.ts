@@ -157,8 +157,8 @@ export class P2PTransportCreator implements TransportCreator {
 
   static async createPrivateLibp2pNode(options: {
     bootstrapAddrs?: string[];
-    relayAddr: string;
-  }): Promise<{ node: Libp2p; connectingAddr: string }> {
+    relayAddr?: string;
+  }): Promise<{ node: Libp2p; connectingAddr?: string }> {
     const node = await createLibp2p({
       addresses: {
         listen: ["/webrtc"],
@@ -199,21 +199,25 @@ export class P2PTransportCreator implements TransportCreator {
         identify: identifyService(),
       },
     });
-    // wait until peer update shows the webrtc relay address is ready
-    return new Promise((resolve) => {
-      node.addEventListener("self:peer:update", (_event) => {
-        for (const addr of node.getMultiaddrs()) {
-          const connectingAddr = addr.toString();
-          if (
-            connectingAddr.includes(options.relayAddr) &&
-            connectingAddr.includes("webrtc")
-          ) {
-            resolve({ node, connectingAddr });
+    const relayAddr = options.relayAddr;
+    if (relayAddr) {
+      // wait until peer update shows the webrtc relay address is ready
+      return new Promise((resolve) => {
+        node.addEventListener("self:peer:update", (_event) => {
+          for (const addr of node.getMultiaddrs()) {
+            const connectingAddr = addr.toString();
+            if (
+              connectingAddr.includes(relayAddr) &&
+              connectingAddr.includes("webrtc")
+            ) {
+              resolve({ node, connectingAddr });
+            }
           }
-        }
+        });
+        node.dial(multiaddr(relayAddr));
       });
-      node.dial(multiaddr(options.relayAddr));
-    });
+    }
+    return { node };
   }
 
   static async createPublicLibp2pNode(options?: { bootstrapAddrs?: string[] }) {

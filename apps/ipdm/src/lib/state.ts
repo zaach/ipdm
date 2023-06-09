@@ -2,7 +2,7 @@ import { computed, effect, Signal, signal } from "@preact/signals";
 import { createContext } from "preact";
 import { ChatContext, ChatEventType, MessageType } from "@ipdm/client";
 import { Message } from "./types";
-import { getRelayAddr } from "./locationParams";
+import { getRelayAddr, getInvite } from "./locationParams";
 
 const IS_BROWSER = typeof window !== "undefined";
 
@@ -24,7 +24,11 @@ export enum ChatStatus {
 }
 
 export async function createAppState() {
-  const relayAddr = getRelayAddr(location.hash) ?? import.meta.env.RELAY_ADDR;
+  const hasInvite = getInvite(location.hash);
+  // The node will connect directly to its peer if it has an invite, so we don't need a relay
+  const relayAddr = hasInvite
+    ? undefined
+    : getRelayAddr(location.hash) ?? import.meta.env.RELAY_ADDR;
   console.log("relayAddr", relayAddr);
   const chatContext = await ChatContext.createP2PEncryptedChatContext({
     relayAddr,

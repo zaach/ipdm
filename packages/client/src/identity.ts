@@ -53,6 +53,7 @@ export class DecentralizedIdentity implements Identity {
     if (!unsecuredJwt.payload.iss) {
       throw new Error("invalid invite");
     }
+    console.log("invite payload", unsecuredJwt);
     const iss = this.decode(unsecuredJwt.payload.iss);
     const parsedClaims = unsecuredJwt.payload as InviteParams["claims"];
     const claims: InviteParams["claims"] = {};
