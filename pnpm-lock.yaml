@@ -106,7 +106,6 @@ importers:
       '@stablelib/ed25519': ^1.0.3
       '@types/jest': ^29.2.4
       '@types/tap': ^15.0.7
-      '@types/webcrypto': ^0.0.28
       '@zaach/rollup-plugin-node-polyfills': ^0.2.2
       blockstore-core: ^4.2.0
       datastore-core: ^9.2.0
@@ -156,7 +155,6 @@ importers:
       '@libp2p/interface-connection': 5.1.0
       '@types/jest': 29.2.4
       '@types/tap': 15.0.7
-      '@types/webcrypto': 0.0.28
       '@zaach/rollup-plugin-node-polyfills': 0.2.2
       eslint: 8.28.0
       interface-blockstore: 5.2.3
@@ -2444,10 +2442,6 @@ packages:
 
   /@types/trouter/3.1.1:
     resolution: {integrity: sha512-XTpWPg/bsGt2oHRmNFfq6kjXDJgeX14pPVFq/PutOe83OFiwrSNP9pV0V2j5O+L/r2XiXRlOZPJtyaOAX5fCBQ==}
-    dev: true
-
-  /@types/webcrypto/0.0.28:
-    resolution: {integrity: sha512-jzAoSUvqA+183nJO/Sc73CREQJsv+p77WJdn532GqA3YXQzlwRwHhClVa7U4O8iB2sJSR7G3v6f1mJFNkwA9YQ==}
     dev: true
 
   /@types/yargs-parser/21.0.0:

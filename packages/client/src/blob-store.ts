@@ -1,17 +1,17 @@
 export interface BlobStoreGetParams {
   ref: string;
-  key: ArrayBuffer;
-  iv: ArrayBuffer;
+  key: JsonWebKey;
+  iv: string;
 }
 
 export interface BlobStorePutResult {
   ref: string;
-  key: ArrayBuffer;
-  iv: ArrayBuffer;
+  key: JsonWebKey;
+  iv: string;
 }
 
 export interface BlobStore {
-  put(data: Uint8Array): Promise<BlobStorePutResult>;
+  put(data: ArrayBuffer): Promise<BlobStorePutResult>;
   get(params: BlobStoreGetParams): Promise<{ data: Uint8Array }>;
 }
 

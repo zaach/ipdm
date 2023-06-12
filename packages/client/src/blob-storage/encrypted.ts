@@ -1,24 +1,34 @@
+import base64 from "@stablelib/base64";
 import all from "it-all";
 import { concat as uint8ArrayConcat } from "uint8arrays/concat";
-import type { BlobTransport } from "../blob-transport";
+import type { Libp2p } from "libp2p";
 import type { BlobStore, BlobStoreGetParams } from "../blob-store";
+import { BlobRepo, IPFSBlobRepo } from "../blob-repo";
 
 let crypto = globalThis.crypto;
 
-// handle nodejs environment
-if (!crypto) {
-  // @ts-expect-error `Crypto.getRandomValues` in `lib.dom.ts` is incorrectly typed: https://github.com/microsoft/TypeScript-DOM-lib-generator/issues/1194
-  crypto = (await import("node:crypto")).webcrypto;
-}
+// Use IIFE to avoid TLA error with rollup: https://github.com/rollup/rollup/issues/3621
+(async function () {
+  // handle nodejs environment
+  if (!crypto) {
+    // @ts-expect-error `Crypto.getRandomValues` in `lib.dom.ts` is incorrectly typed: https://github.com/microsoft/TypeScript-DOM-lib-generator/issues/1194
+    crypto = (await import("node:crypto")).webcrypto;
+  }
+})();
 
 export class EncryptedBlobStore implements BlobStore {
-  #repo: BlobTransport;
+  #repo: BlobRepo;
 
-  constructor(repo: BlobTransport) {
+  constructor(repo: BlobRepo) {
     this.#repo = repo;
   }
 
-  async put(data: Uint8Array) {
+  static async fromLibp2pNode(node: Libp2p) {
+    const repo = await IPFSBlobRepo.fromLibp2pNode(node);
+    return new EncryptedBlobStore(repo);
+  }
+
+  async put(data: ArrayBuffer) {
     // get encryption key from web crypto
     const key = await crypto.subtle.generateKey(
       {
@@ -41,18 +51,18 @@ export class EncryptedBlobStore implements BlobStore {
 
     return {
       ref: result.ref,
-      key: await crypto.subtle.exportKey("raw", key),
-      iv,
+      key: await crypto.subtle.exportKey("jwk", key),
+      iv: base64.encode(iv),
     };
   }
 
   async get(params: BlobStoreGetParams) {
     const { ref, key, iv } = params;
-    const result = this.#repo.get(ref);
+    const result = await this.#repo.get(ref);
     const ciphertext = uint8ArrayConcat(await all(result.data));
 
     const ekey = await crypto.subtle.importKey(
-      "raw",
+      "jwk",
       key,
       {
         name: "AES-GCM",
@@ -66,7 +76,7 @@ export class EncryptedBlobStore implements BlobStore {
         await crypto.subtle.decrypt(
           {
             name: "AES-GCM",
-            iv,
+            iv: base64.decode(iv),
           },
           ekey,
           ciphertext

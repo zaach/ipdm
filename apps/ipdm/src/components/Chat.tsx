@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useContext } from "preact/hooks";
+import { useEffect, useRef, useContext } from "preact/hooks";
 import { computed, useSignal, effect } from "@preact/signals";
 import {
   AppState,
   AppStateData,
   ConnectionStatus,
-  ChatStatus,
   createAppState,
   setupMessageListeners,
 } from "../lib/state";
@@ -15,6 +14,8 @@ import { ShareLink } from "../components/ShareLink";
 import { UpdateUsernameDialog } from "../components/UpdateUsernameDialog";
 import { Header } from "../components/Header";
 import { MessageBox } from "../components/Messages";
+import { Spinner } from "../components/Spinner";
+import { SendField } from "../components/SendField";
 
 export default function StateWrapper() {
   const appState = useSignal<AppStateData>(undefined!);
@@ -28,7 +29,13 @@ export default function StateWrapper() {
   }, []);
   const isLoaded = computed(() => typeof appState.value !== "undefined");
   console.log("render?", isLoaded.value, appState.value);
-  return isLoaded.value ? <ChatWrapper appState={appState.value!} /> : null;
+  return isLoaded.value ? (
+    <ChatWrapper appState={appState.value!} />
+  ) : (
+    <div class="flex flex-col h-screen justify-center items-center">
+      <Spinner />
+    </div>
+  );
 }
 
 export function ChatWrapper({ appState }: { appState: AppStateData }) {
@@ -83,7 +90,7 @@ function ChatHistory() {
   }, [messages.value.length]);
 
   const displayMessages = computed(
-    () => messages.value.filter((m) => !!m.msg) as DisplayMessage[]
+    () => messages.value.filter((m) => !!(m.msg || m.files)) as DisplayMessage[]
   );
 
   return (
@@ -100,68 +107,6 @@ function ChatHistory() {
           <ShareLink />
         </div>
       )}
-    </div>
-  );
-}
-
-function SendField() {
-  const { chatStatus, chatContext } = useContext(AppState);
-  const message = useSignal("");
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const disabled = computed(
-    () =>
-      chatStatus.value === ChatStatus.uninitialized ||
-      chatStatus.value === ChatStatus.disconnected
-  );
-
-  const onSubmit = useCallback(
-    (e: any) => {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      if (!disabled.value) {
-        if (message.value === "/bye") {
-          chatContext.disconnect();
-        } else {
-          const msg = {
-            msg: message.value,
-          };
-          chatContext.send(msg);
-        }
-        message.value = "";
-      }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [message.value, disabled.value, chatContext]
-  );
-
-  return (
-    <div className="sticky pwa:pb-10 bottom-0 bg-base-200 self-end items-center justify-between w-full p-3">
-      <form className="flex" onSubmit={onSubmit}>
-        <div className="input inline-flex w-full">
-          <input
-            type="text"
-            placeholder="Message"
-            value={message.value}
-            onInput={(e) => (message.value = e.currentTarget.value)}
-            className="transition input input-ghost focus:fg-content placeholder:text-gray-600 focus:placeholder:text-gray-500 focus:outline-none grow pl-0 disabled:bg-transparent disabled:border-0"
-            autoComplete="off"
-            ref={inputRef}
-            disabled={disabled.value}
-            required
-          />
-          <button type="submit" disabled={disabled.value}>
-            <svg
-              className="w-5 h-5 transition hover:text-gray-400 text-gray-500 origin-center transform rotate-90 ml-3"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-            </svg>
-          </button>
-        </div>
-      </form>
     </div>
   );
 }

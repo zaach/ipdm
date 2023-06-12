@@ -1,3 +1,4 @@
+import type { Libp2p } from "libp2p";
 import { InternalFormat, InternalFormatJson } from "./encoding";
 import {
   BaseChatEvent,
@@ -56,14 +57,13 @@ export class ChatContext<
   }
 
   static async createP2PEncryptedChatContext({
-    relayAddr,
+    node,
+    connectingAddr,
   }: {
-    relayAddr: string;
+    node: Libp2p;
+    connectingAddr?: string;
   }) {
     const eventTarget = new EventTarget();
-    // Wait until we have a node with a relayed address
-    const { node, connectingAddr } =
-      await P2PTransportCreator.createPrivateLibp2pNode({ relayAddr });
     const transportCreator = new P2PTransportCreator(node);
     const identity = new DecentralizedIdentity({ addr: connectingAddr });
     const chatContext = new DurableChatContext(
