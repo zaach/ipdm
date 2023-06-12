@@ -1,6 +1,12 @@
 import { computed, effect, Signal, signal } from "@preact/signals";
 import { createContext } from "preact";
-import { ChatContext, ChatEventType, MessageType } from "@ipdm/client";
+import {
+  ChatContext,
+  ChatEventType,
+  MessageType,
+  EncryptedBlobStore,
+  createPrivateLibp2pNode,
+} from "@ipdm/client";
 import { Message } from "./types";
 import { getRelayAddr, getInvite } from "./locationParams";
 
@@ -30,9 +36,13 @@ export async function createAppState() {
     ? undefined
     : getRelayAddr(location.hash) ?? import.meta.env.RELAY_ADDR;
   console.log("relayAddr", relayAddr);
-  const chatContext = await ChatContext.createP2PEncryptedChatContext({
-    relayAddr,
-  });
+  const existingNode = await createPrivateLibp2pNode({ relayAddr });
+  const chatContext = await ChatContext.createP2PEncryptedChatContext(
+    existingNode
+  );
+  const attachmentStore = await EncryptedBlobStore.fromLibp2pNode(
+    existingNode.node
+  );
 
   const username = signal(
     (IS_BROWSER && localStorage?.getItem("username")) || ""
@@ -107,6 +117,7 @@ export async function createAppState() {
     chatReady,
     joinLink,
     chatContext,
+    attachmentStore,
   };
 }
 
@@ -124,7 +135,7 @@ const addMessageFn = (messages: Signal<Message[]>) => (msg: Message) => {
       return m;
     });
   }
-  if (msg.msg) {
+  if (msg.msg || msg.files) {
     messages.value = [...msgs, msg];
   } else {
     messages.value = msgs;
@@ -140,6 +151,7 @@ export function setupMessageListeners(
   const systemMsgId = signal(0);
 
   chatContext.on(ChatEventType.message, (e) => {
+    console.log("got message", e.detail);
     if (e.detail.type === MessageType.message) {
       addMessage({
         ...e.detail,

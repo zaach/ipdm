@@ -2,6 +2,13 @@ export type Message = {
   uid: string;
   id?: number;
   msg?: string;
+  files?: {
+    name: string;
+    ref: string;
+    mime: string;
+    key: JsonWebKey;
+    iv: string;
+  }[];
   lastSeenId?: number;
   self?: boolean;
   seen?: boolean;
@@ -9,6 +16,5 @@ export type Message = {
   time?: number;
 };
 
-export type DisplayMessage =
-  & Omit<Message, "msg">
-  & Required<Pick<Message, "msg">>;
+export type DisplayMessage = Omit<Message, "msg"> &
+  Required<Pick<Message, "msg">>;

@@ -1,5 +1,9 @@
 import { multiaddr } from "@multiformats/multiaddr";
-import { ChatContext, ChatEventType } from "@ipdm/client";
+import {
+  ChatContext,
+  ChatEventType,
+  createPrivateLibp2pNode,
+} from "@ipdm/client";
 
 let chatContext;
 
@@ -8,9 +12,10 @@ const sendSection = document.getElementById("send-section");
 
 async function createNode({ relayAddr, invite }) {
   console.log("relay???", relayAddr);
-  const chat = await ChatContext.createP2PEncryptedChatContext({
+  const node = await createPrivateLibp2pNode({
     relayAddr,
   });
+  const chat = await ChatContext.createP2PEncryptedChatContext(node);
   chat.on(ChatEventType.channel_open, (event) => {
     console.log("channel_open", event);
     appendOutput(`Connected to '${relayAddr}'`);

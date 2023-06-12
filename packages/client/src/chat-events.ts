@@ -32,8 +32,8 @@ export class ChatEvent<
   T extends ChatEventType,
   D extends BaseChatEvent[T] = BaseChatEvent[T]
 > extends CustomEvent<D> {
-  // eslint-disable no-useless-constructor
-  constructor(name: T, detail: CustomEventInit<D>) { // eslint-disable-line
+  // eslint-disable-next-line @typescript-eslint/no-useless-constructor
+  constructor(name: T, detail: CustomEventInit<D>) {
     super(name, detail);
   }
 
@@ -68,7 +68,16 @@ export enum MessageType {
 
 export interface BaseMessages {
   [MessageType.meta]: { name: string };
-  [MessageType.message]: { msg: string };
+  [MessageType.message]: {
+    msg: string;
+    files?: {
+      name: string;
+      ref: string;
+      mime: string;
+      key: JsonWebKey;
+      iv: string;
+    }[];
+  };
   [MessageType.ack]: Record<never, never>;
   [MessageType.disconnect]: Record<never, never>;
 }

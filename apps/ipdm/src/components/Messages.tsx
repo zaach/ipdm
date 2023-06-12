@@ -1,5 +1,9 @@
 import { ComponentChildren } from "preact";
+import { useContext, useEffect, useRef } from "preact/hooks";
+import { useSignal, computed } from "@preact/signals";
 import { DisplayMessage } from "../lib/types";
+import { AppState } from "../lib/state";
+import { Spinner } from "./Spinner";
 
 type Expanded = string | { img: string; ltr: boolean };
 
@@ -36,10 +40,25 @@ export function MessageBox(message: DisplayMessage) {
     return SystemMessage(message);
   }
   const expanded = expandMessage(message.msg, !!message.self);
-  return message.self ? (
-    <SelfMessage message={message}>{expanded}</SelfMessage>
+  const isSelf = message.self;
+  return isSelf ? (
+    <>
+      {message.files && (
+        <SelfMessage message={message}>
+          <Attachments files={message.files} />
+        </SelfMessage>
+      )}
+      {message.msg && <SelfMessage message={message}>{expanded}</SelfMessage>}
+    </>
   ) : (
-    <OtherMessage message={message}>{expanded}</OtherMessage>
+    <>
+      {message.files && (
+        <OtherMessage message={message}>
+          <Attachments files={message.files} />
+        </OtherMessage>
+      )}
+      {message.msg && <OtherMessage message={message}>{expanded}</OtherMessage>}
+    </>
   );
 }
 
@@ -68,6 +87,76 @@ export function SystemMessage({ msg, uid }: DisplayMessage) {
     >
       {msg}
     </li>
+  );
+}
+
+function isImage(mime: string) {
+  return mime.startsWith("image/");
+}
+
+function Attachment({
+  file,
+}: {
+  file: Required<DisplayMessage>["files"][number];
+}) {
+  const { attachmentStore } = useContext(AppState);
+  const uri = useSignal<string>("");
+  const ref = useRef<HTMLImageElement>(null);
+  const hasLoaded = computed(() => uri.value !== "");
+  useEffect(() => {
+    const fn = async () => {
+      console.log("fetching", file);
+      const raw = await attachmentStore.get(file).catch((e) => {
+        console.error("failed to fetch attachment", e);
+        throw e;
+      });
+      console.log("got raw");
+      const blob = new Blob([raw.data], { type: file.mime });
+      // convert to data uri using URL.createObjectURL
+      const blobUri = URL.createObjectURL(blob);
+      console.log("uri", blobUri);
+      uri.value = blobUri;
+    };
+    fn();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attachmentStore, file]);
+  console.log("hasLoaded", hasLoaded.value, file.name, uri.value);
+  return isImage(file.mime) ? (
+    hasLoaded.value ? (
+      <img
+        ref={ref}
+        src={uri.value}
+        onLoad={() => {
+          if (ref.current) {
+            URL.revokeObjectURL(ref.current.src);
+          }
+        }}
+        className="max-h-48 rounded-lg"
+      />
+    ) : (
+      <Spinner />
+    )
+  ) : hasLoaded.value ? (
+    <a href={uri.value} download={file.name}>
+      {file.name}
+    </a>
+  ) : (
+    <a href={uri.value} download={file.name}>
+      <Spinner />
+      {file.name}
+    </a>
+  );
+}
+
+function Attachments({ files }: Required<Pick<DisplayMessage, "files">>) {
+  return (
+    <div className="flex flex-col">
+      {files.map((file) => (
+        <span key={file.ref}>
+          <Attachment file={file} />
+        </span>
+      ))}
+    </div>
   );
 }
 
