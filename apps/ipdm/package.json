@@ -6,6 +6,7 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
+    "preview": "vite preview --port 8000",
     "build": "tsc --noEmit && vite build",
     "relay": "relay",
     "lint": "eslint --ext .ts,tsx --ignore-path .gitignore ."

@@ -51,7 +51,6 @@ export function SendField() {
           Promise.all(
             files.value.map(async (file) => {
               const res = await attachmentStore.put(await file.arrayBuffer());
-              console.log("put", res);
               return {
                 name: file.name,
                 mime: file.type,
@@ -61,7 +60,6 @@ export function SendField() {
               };
             })
           ).then((res) => {
-            console.log("files res", res);
             files.value = [];
             message.value = "";
             inputRef.current!.value = "";
@@ -83,8 +81,6 @@ export function SendField() {
     },
     [message, files, disabled.value, chatContext, attachmentStore]
   );
-
-  console.log("render");
 
   return (
     <div className="sticky pwa:pb-10 bottom-0 bg-base-200 self-end items-center justify-between w-full p-3">
@@ -149,7 +145,6 @@ function AttachedFiles({
   files?: File[];
   onRemoveAttachments: () => void;
 }) {
-  console.log("files?", files);
   return files?.length ? (
     <div className="flex gap-2 justify-end items-center mb-2">
       {files.map((file) => (
@@ -192,7 +187,7 @@ function File({ file }: { file: File }) {
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 20 20"
         fill="currentColor"
-        class="w-5 h-5"
+        className="w-5 h-5"
       >
         <path d="M3 3.5A1.5 1.5 0 014.5 2h6.879a1.5 1.5 0 011.06.44l4.122 4.12A1.5 1.5 0 0117 7.622V16.5a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 013 16.5v-13z" />
       </svg>
