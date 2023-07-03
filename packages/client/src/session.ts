@@ -1,10 +1,5 @@
 import { InitiatorCryptoContext, JoinerCryptoContext } from "./crypto";
-import {
-  Base64EnvelopeEncoding,
-  EnvelopeEncoding,
-  InternalFormat,
-  InternalFormatJson,
-} from "./encoding";
+import { Base64EnvelopeEncoding, EnvelopeEncoding } from "./encoding";
 import { encodeUrlParam } from "./param-encoding";
 import {
   FetchSenderTransport,
@@ -73,7 +68,6 @@ export class EncryptedSession implements Session {
     protected receiver: ReceiverTransport = new SseTransport(),
     protected sender: SenderTransport = new FetchSenderTransport(),
     protected wireFormat: EnvelopeEncoding = new Base64EnvelopeEncoding(),
-    protected format: InternalFormat = new InternalFormatJson(),
     protected enableCache = true
   ) {}
 
@@ -224,21 +218,17 @@ export class EncryptedSessionCreator<
     initiator: InitiatorCryptoContext,
     params?: TransportParams
   ) {
-    return new EncryptedSession(
-      initiator,
-      await this.transportCreator.createReceiverTransport(params),
-      await this.transportCreator.createSenderTransport(params)
-    );
+    const { senderTransport, receiverTransport } =
+      await this.transportCreator.createTransports(params);
+    return new EncryptedSession(initiator, receiverTransport, senderTransport);
   }
   protected async createJoinerSession(
     joiner: JoinerCryptoContext,
     params?: TransportParams
   ) {
-    return new EncryptedSession(
-      joiner,
-      await this.transportCreator.createReceiverTransport(params),
-      await this.transportCreator.createSenderTransport(params)
-    );
+    const { senderTransport, receiverTransport } =
+      await this.transportCreator.createTransports(params);
+    return new EncryptedSession(joiner, receiverTransport, senderTransport);
   }
 
   async #createInvite() {
@@ -349,20 +339,24 @@ export class EncryptedSessionWithReplayCreator<
     initiator: InitiatorCryptoContext,
     params?: TransportParams
   ) {
+    const { senderTransport, receiverTransport } =
+      await this.transportCreator.createTransports(params);
     return new EncryptedSessionWithReplay(
       initiator,
-      await this.transportCreator.createReceiverTransport(params),
-      await this.transportCreator.createSenderTransport(params)
+      receiverTransport,
+      senderTransport
     );
   }
   protected async createJoinerSession(
     joiner: JoinerCryptoContext,
     params?: TransportParams
   ) {
+    const { senderTransport, receiverTransport } =
+      await this.transportCreator.createTransports(params);
     return new EncryptedSessionWithReplay(
       joiner,
-      await this.transportCreator.createReceiverTransport(params),
-      await this.transportCreator.createSenderTransport(params)
+      receiverTransport,
+      senderTransport
     );
   }
 }

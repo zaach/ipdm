@@ -32,7 +32,9 @@ class P2PTransport {
     }
   ) {
     this.#libp2p = libp2p;
-    this.#addr = options?.connectingAddress;
+    if (options?.connectingAddress) {
+      this.#addr = options?.connectingAddress;
+    }
 
     libp2p.addEventListener("connection:open", (event) => {
       console.log("connection:open", event.detail);
@@ -122,6 +124,7 @@ class P2PTransport {
           resolve(stream);
         });
       });
+      await this.#libp2p.unhandle(PROTO);
     }
 
     return this.#stream;
@@ -141,7 +144,6 @@ class P2PTransport {
 
 export class P2PTransportCreator implements TransportCreator {
   #libp2p: Libp2p;
-  #transport?: P2PTransport;
 
   constructor(libp2p: Libp2p) {
     this.#libp2p = libp2p;
@@ -158,18 +160,12 @@ export class P2PTransportCreator implements TransportCreator {
     return createPublicLibp2pNode(options);
   }
 
-  async createSenderTransport(params?: TransportParams) {
-    if (!this.#transport) {
-      this.#transport = new P2PTransport(this.#libp2p, params);
-    }
-    return new P2PSenderTransport(this.#transport);
-  }
-
-  async createReceiverTransport(params?: TransportParams) {
-    if (!this.#transport) {
-      this.#transport = new P2PTransport(this.#libp2p, params);
-    }
-    return new P2PReceiverTransport(this.#transport);
+  async createTransports(params?: TransportParams) {
+    const transport = new P2PTransport(this.#libp2p, params);
+    return {
+      senderTransport: new P2PSenderTransport(transport),
+      receiverTransport: new P2PReceiverTransport(transport),
+    };
   }
 }
 

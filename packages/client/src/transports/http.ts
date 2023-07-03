@@ -78,14 +78,14 @@ export class HttpTransportCreator implements TransportCreator {
     private ReceiverClass: Constructor<ReceiverTransport> = SseTransport
   ) {}
 
-  async createSenderTransport(params?: { connectingAddress?: string }) {
-    return new this.SenderClass(
-      params?.connectingAddress ?? this.options.baseSendApiUrl
-    );
-  }
-  async createReceiverTransport(params?: { connectingAddress?: string }) {
-    return new this.ReceiverClass(
-      params?.connectingAddress ?? this.options.baseRecieveApiUrl
-    );
+  async createTransports(params?: { connectingAddress?: string }) {
+    return {
+      senderTransport: new this.SenderClass(
+        params?.connectingAddress ?? this.options.baseSendApiUrl
+      ),
+      receiverTransport: new this.ReceiverClass(
+        params?.connectingAddress ?? this.options.baseRecieveApiUrl
+      ),
+    };
   }
 }

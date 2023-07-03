@@ -35,8 +35,13 @@ export class ChatContext<
   constructor(
     public eventTarget: EventTarget,
     private sessionCreator: SessionCreatorType,
+    session?: ConnectedSession<Session>,
     protected format: InternalFormat = new InternalFormatJson()
-  ) {}
+  ) {
+    if (session) {
+      this.session = session;
+    }
+  }
 
   static createEncryptedChatContext({
     baseApiUrl,
@@ -123,6 +128,10 @@ export class ChatContext<
         this.emit(ChatEventType.channel_open, evt.detail);
         break;
     }
+  }
+
+  async initMessage(msg: ArrayBuffer) {
+    await this.#handleMessage(msg);
   }
 
   async setUsername(name: string) {

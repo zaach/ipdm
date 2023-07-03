@@ -13,10 +13,12 @@ export type TransportParams = {
   connectingAddress: string;
 };
 export interface TransportCreator {
-  createSenderTransport: (params?: TransportParams) => Promise<SenderTransport>;
-  createReceiverTransport: (
+  createTransports: (
     params?: TransportParams
-  ) => Promise<ReceiverTransport>;
+  ) => Promise<{
+    senderTransport: SenderTransport;
+    receiverTransport: ReceiverTransport;
+  }>;
 }
 
 export * from "./transports/http";

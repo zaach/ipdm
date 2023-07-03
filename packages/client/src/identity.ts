@@ -1,9 +1,31 @@
 import * as jose from "jose";
 import {
+  TransportCreator,
+  SenderTransport,
+  ReceiverTransport,
+  P2PTransportCreator,
+} from "./transports";
+import { InitiatorCryptoContext, JoinerCryptoContext } from "./crypto";
+import {
+  Base64EnvelopeEncoding,
+  EnvelopeEncoding,
+  InternalFormat,
+  InternalFormatJson,
+  HandshakeEnvelope,
+} from "./encoding";
+import { Message, MessageType } from "./chat-events";
+import {
   didFromKeyBytes,
   EDWARDS_DID_PREFIX,
   keyBytesFromDid,
 } from "./did/mod";
+import {
+  Session,
+  SessionCreator,
+  ConnectedSession,
+  SessionEventType,
+  SessionEventValues,
+} from "./session";
 
 export interface InviteParams {
   iss: Uint8Array;
@@ -61,5 +83,78 @@ export class DecentralizedIdentity implements Identity {
       claims.addr = parsedClaims.addr;
     }
     return { iss, claims };
+  }
+}
+
+export class EphemeralHPKEIdentity {
+  #username?: string;
+  #sessionCreator: SessionCreator;
+  #format: InternalFormat;
+  #wireFormat: EnvelopeEncoding;
+
+  constructor(
+    sessionCreator: SessionCreator,
+    format: InternalFormat = new InternalFormatJson(),
+    wireFormat: EnvelopeEncoding = new Base64EnvelopeEncoding(),
+    protected readonly transportCreator: TransportCreator,
+    { username }: { username: string }
+  ) {
+    this.#username = username;
+    this.#sessionCreator = sessionCreator;
+    this.#format = format;
+    this.#wireFormat = wireFormat;
+  }
+
+  protected async accept(channelId: string): Promise<
+    | {
+        ok: true;
+        message: string;
+        senderTransport: SenderTransport;
+        receiverTransport: ReceiverTransport;
+      }
+    | { ok: false }
+  > {
+    const { senderTransport, receiverTransport } =
+      await this.transportCreator.createTransports();
+    for await (const event of receiverTransport.listen(channelId)) {
+      if (event.type === "open") {
+        console.log("open", event);
+      } else if (event.type === "error") {
+        console.log("error", event);
+      } else {
+        try {
+          // TODO drop if not intended for us
+          return {
+            message: event.data,
+            ok: true,
+            senderTransport,
+            receiverTransport,
+          };
+        } catch (e) {
+          console.warn(event, e);
+        }
+      }
+    }
+    return { ok: false };
+  }
+
+  async initSessionFromKeyBundle(invite: string) {
+    const joiner = new JoinerCryptoContext();
+
+    const joinMessage: Message<MessageType.meta> = {
+      type: MessageType.meta,
+      name: this.#username || "👽",
+      id: 0,
+      lastSeenId: 0,
+    };
+    const plaintext = this.#format.encode(joinMessage);
+
+    const { envelope, toChannelId, sessionId, toSessionId } =
+      await joiner.initSender(invite.iss, plaintext);
+
+    const session = await this.#sessionCreator.joinWithInvite(
+      invite,
+      this.format.encode(joinMessage)
+    );
   }
 }
