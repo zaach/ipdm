@@ -5,11 +5,10 @@ import type {
   TransportParams,
 } from "../transports";
 import type { Libp2p } from "libp2p";
-import type { Stream } from "@libp2p/interface-connection";
+import type { Stream } from "@libp2p/interface";
 import { createPrivateLibp2pNode, createPublicLibp2pNode } from "../lib/libp2p";
 import { pushable, Pushable } from "it-pushable";
 import { multiaddr } from "@multiformats/multiaddr";
-import { pipe } from "it-pipe";
 
 const PROTO = "/ipdm/1.0.0";
 
@@ -48,7 +47,7 @@ class P2PTransport {
     let ended = false;
     return {
       async next(): Promise<IteratorResult<MessageEvent<any>>> {
-        const stream = await self.#connect();
+        const stream = (await self.#connect())!;
         if (!started) {
           started = true;
           return {
@@ -62,7 +61,8 @@ class P2PTransport {
             value: null,
           };
         }
-        const next = await stream.source.next();
+        const iterator = stream[Symbol.asyncIterator]();
+        const next = await iterator.next();
         if (next.done) {
           ended = true;
           return {
@@ -92,6 +92,9 @@ class P2PTransport {
       [Symbol.asyncIterator]() {
         return this;
       },
+      async [Symbol.asyncDispose]() {
+        await this.return?.();
+      },
     };
   }
 
@@ -114,11 +117,9 @@ class P2PTransport {
       const conn = await this.#libp2p.dial(ma);
       const stream = await conn.newStream([PROTO]);
       this.#stream = stream;
-      pipe(this.#outChannel, stream);
     } else {
       this.#stream = await new Promise((resolve) => {
-        this.#libp2p.handle(PROTO, ({ stream, connection: _connection }) => {
-          pipe(this.#outChannel, stream);
+        this.#libp2p.handle(PROTO, (stream) => {
           resolve(stream);
         });
       });
@@ -129,13 +130,15 @@ class P2PTransport {
 
   async send(body: string, _channelId: string) {
     await this.#connect();
-    this.#outChannel.push(new TextEncoder().encode(body));
+    if (!this.#stream) {
+      throw new Error("Stream not established");
+    }
+    this.#stream.send(new TextEncoder().encode(body));
     return { ok: true, status: 200, statusText: "OK" };
   }
 
   async closeSender() {
     this.#stream?.close();
-    this.#outChannel.end();
   }
 }
 

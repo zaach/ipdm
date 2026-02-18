@@ -14,10 +14,11 @@
     "test": "turbo run test",
     "clean": "turbo run clean"
   },
+  "packageManager": "npm@11.9.0",
   "devDependencies": {
-    "eslint": "^8.40.0",
-    "eslint-config-turbo": "^1.9.4",
-    "turbo": "^1.9.4"
-  },
-  "packageManager": "pnpm@7.15.0"
+    "react": "^18.3.1",
+    "eslint": "^10.0.0",
+    "eslint-config-turbo": "^2.8.9",
+    "turbo": "^2.8.9"
+  }
 }

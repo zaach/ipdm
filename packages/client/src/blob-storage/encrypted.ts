@@ -1,4 +1,4 @@
-import base64 from "@stablelib/base64";
+import * as base64 from "@stablelib/base64";
 import all from "it-all";
 import { concat as uint8ArrayConcat } from "uint8arrays/concat";
 import type { Libp2p } from "libp2p";
@@ -59,7 +59,7 @@ export class EncryptedBlobStore implements BlobStore {
   async get(params: BlobStoreGetParams) {
     const { ref, key, iv } = params;
     const result = await this.#repo.get(ref);
-    const ciphertext = uint8ArrayConcat(await all(result.data));
+    const ciphertext = uint8ArrayConcat(await all(result.data)).buffer as ArrayBuffer;
 
     const ekey = await crypto.subtle.importKey(
       "jwk",
@@ -76,7 +76,7 @@ export class EncryptedBlobStore implements BlobStore {
         await crypto.subtle.decrypt(
           {
             name: "AES-GCM",
-            iv: base64.decode(iv),
+            iv: base64.decode(iv).buffer as ArrayBuffer,
           },
           ekey,
           ciphertext
