@@ -1,14 +1,13 @@
-import { Libp2p, createLibp2p } from "libp2p";
+import { createLibp2p } from "libp2p";
+import type { Libp2p } from "@libp2p/interface";
 import { multiaddr } from "@multiformats/multiaddr";
 import { bootstrap } from "@libp2p/bootstrap";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { webRTC, webRTCDirect } from "@libp2p/webrtc";
 import { webSockets } from "@libp2p/websockets";
-import * as filters from "@libp2p/websockets/filters";
-import { mplex } from "@libp2p/mplex";
-import { circuitRelayTransport } from "libp2p/circuit-relay";
+import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
 import { noise } from "@chainsafe/libp2p-noise";
-import { identifyService } from "libp2p/identify";
+import { identify } from "@libp2p/identify";
 
 export async function createPrivateLibp2pNode(options: {
   bootstrapAddrs?: string[];
@@ -21,15 +20,11 @@ export async function createPrivateLibp2pNode(options: {
     transports: [
       webRTC(),
       webRTCDirect(),
-      webSockets({
-        filter: filters.all,
-      }),
-      circuitRelayTransport({
-        discoverRelays: 1,
-      }),
+      webSockets(),
+      circuitRelayTransport(),
     ],
-    connectionEncryption: [noise()],
-    streamMuxers: [mplex(), yamux()],
+    connectionEncrypters: [noise()],
+    streamMuxers: [yamux()],
     peerDiscovery: options?.bootstrapAddrs?.length
       ? [
           bootstrap({
@@ -51,7 +46,7 @@ export async function createPrivateLibp2pNode(options: {
       },
     },
     services: {
-      identify: identifyService(),
+      identify: identify(),
     },
   });
   const relayAddr = options.relayAddr;
@@ -90,13 +85,11 @@ export async function createPublicLibp2pNode(options?: {
     },
     transports: [
       tcp(),
-      webSockets({
-        filter: filters.all,
-      }),
+      webSockets(),
       webRTCDirect(),
     ],
-    connectionEncryption: [noise()],
-    streamMuxers: [mplex(), yamux()],
+    connectionEncrypters: [noise()],
+    streamMuxers: [yamux()],
     peerDiscovery: options?.bootstrapAddrs?.length
       ? [
           bootstrap({
@@ -118,7 +111,7 @@ export async function createPublicLibp2pNode(options?: {
       },
     },
     services: {
-      identify: identifyService(),
+      identify: identify(),
     },
   });
 

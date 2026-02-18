@@ -116,7 +116,7 @@ export class EncryptedSession implements Session {
     }
 
     const { envelope, toChannelId, sessionId, toSessionId } =
-      await this.cryptoContext.initSender(pk, plaintext);
+      await this.cryptoContext.initSender(pk.buffer as ArrayBuffer, plaintext);
     const encoded = this.wireFormat.encodeHandshakeEnvelope(envelope);
     this.sessionId = encodeUrlParam(sessionId);
     this.toSessionId = encodeUrlParam(toSessionId);

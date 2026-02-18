@@ -1,19 +1,19 @@
 import * as hpke from "hpke-js";
-import ed25519 from "@stablelib/ed25519";
+import * as ed25519 from "@stablelib/ed25519";
 import * as uint8arrays from "uint8arrays";
 
 const { Kem, Kdf, Aead, CipherSuite } = hpke;
 
-const EMPTY_SALT = new Uint8Array(0);
+const EMPTY_SALT = new Uint8Array(0).buffer as ArrayBuffer;
 const LABEL_CHANNEL_ID = new TextEncoder().encode("channel_id");
-const EXPORT_LABEL_NONCE = new TextEncoder().encode("5edm nonce");
-const EXPORT_LABEL_KEY = new TextEncoder().encode("5edm key");
+const EXPORT_LABEL_NONCE = new TextEncoder().encode("ipdm nonce").buffer as ArrayBuffer;
+const EXPORT_LABEL_KEY = new TextEncoder().encode("ipdm key").buffer as ArrayBuffer;
 const EXPORT_LABEL_SESSIONID_RECIPIENT = new TextEncoder().encode(
-  "5edm recipient session id"
-);
+  "ipdm recipient session id"
+).buffer as ArrayBuffer;
 const EXPORT_LABEL_SESSIONID_SENDER = new TextEncoder().encode(
-  "5edm sender session id"
-);
+  "ipdm sender session id"
+).buffer as ArrayBuffer;
 
 export interface Envelope {
   // header: channelid
@@ -28,14 +28,22 @@ export interface HandshakeEnvelope {
   payload: [ArrayBuffer, ArrayBuffer];
 }
 
-const concatBuffers = function (buffer1: ArrayBuffer, buffer2: ArrayBuffer) {
-  return uint8arrays.concat([new Uint8Array(buffer1), new Uint8Array(buffer2)]);
+export type ByteLike = ArrayBuffer | Uint8Array<ArrayBuffer>;
+function byteParam(param: ByteLike): ArrayBuffer {
+  return "buffer" in param ? param.buffer as ArrayBuffer : param;
+}
+
+const concatBuffers = function (buffer1: ArrayBuffer, buffer2: ArrayBuffer): ArrayBuffer {
+  return uint8arrays.concat([new Uint8Array(buffer1), new Uint8Array(buffer2)]).buffer as ArrayBuffer;
 };
+
+// bidirectional refactor: https://github.com/dajiaji/hpke-js/issues/284
 
 export abstract class Encrypter {
   sessionId?: ArrayBuffer;
   toSessionId?: ArrayBuffer;
-  protected context?: hpke.EncryptionContextInterface;
+  nonce?: ArrayBuffer;
+  protected context?: hpke.AeadEncryptionContext;
 
   constructor(
     protected suite = new CipherSuite({
@@ -46,10 +54,10 @@ export abstract class Encrypter {
   ) {}
 
   async seal(
-    bytes: ArrayBuffer,
+    bytes: ByteLike,
     additionalData?: ArrayBuffer
   ): Promise<Envelope> {
-    if (!this.context || !this.toSessionId) {
+    if (!this.context || !this.toSessionId || !this.nonce) {
       throw new Error("CryptoContext not initialized");
     }
     const ad = additionalData
@@ -57,21 +65,21 @@ export abstract class Encrypter {
       : this.toSessionId;
     return {
       header: ad,
-      payload: await this.context.seal(bytes, ad),
+      payload: await this.context.seal(this.nonce, byteParam(bytes), ad),
     };
   }
 
   async open(
-    bytes: ArrayBuffer,
+    bytes: ByteLike,
     header: ArrayBuffer,
     additionalData?: ArrayBuffer
   ): Promise<ArrayBuffer> {
-    if (!this.context) {
+    if (!this.context || !this.nonce) {
       throw new Error("CryptoContext not initialized");
     }
     const ad = additionalData ? concatBuffers(header, additionalData) : header;
     try {
-      const result = await this.context.open(bytes, ad);
+      const result = await this.context.open(this.nonce, byteParam(bytes), ad);
       return result;
     } catch (err) {
       console.log("failed to decrypt.", err);
@@ -80,8 +88,7 @@ export abstract class Encrypter {
   }
 
   protected async deriveChannelId(pubkey: ArrayBuffer): Promise<ArrayBuffer> {
-    const kdf = await this.suite.kdfContext();
-    const raw = await kdf.labeledExtract(
+    const raw = await this.suite.kdf.labeledExtract(
       EMPTY_SALT,
       LABEL_CHANNEL_ID,
       new Uint8Array(pubkey)
@@ -103,10 +110,10 @@ export class InitiatorCryptoContext extends Encrypter {
     handshakeChannelId: ArrayBuffer;
   }> {
     const edkp = ed25519.generateKeyPair();
-    const x25519sk = ed25519.convertSecretKeyToX25519(edkp.secretKey);
+    const x25519sk = ed25519.convertSecretKeyToX25519(edkp.secretKey).buffer as ArrayBuffer;
     this.#sk = await this.suite.importKey("raw", x25519sk, false);
     // serialize publicKey for sharing
-    const serializedPublicKey = edkp.publicKey;
+    const serializedPublicKey = edkp.publicKey.buffer as ArrayBuffer;
     const handshakeChannelId = await this.deriveChannelId(serializedPublicKey);
     this.handshakeChannelId = handshakeChannelId;
     return { serializedPublicKey, handshakeChannelId };
@@ -117,7 +124,7 @@ export class InitiatorCryptoContext extends Encrypter {
     sessionId: ArrayBuffer;
     toSessionId: ArrayBuffer;
   }> {
-    if (!this.#sk) {
+    if (!this.#sk || !this.handshakeChannelId) {
       throw new Error("CryptoContext not initialized");
     }
 
@@ -144,7 +151,7 @@ export class InitiatorCryptoContext extends Encrypter {
 
     const senderPublicKey = await this.suite.importKey(
       "raw",
-      ed25519.convertPublicKeyToX25519(new Uint8Array(senPubKeyRaw))
+      ed25519.convertPublicKeyToX25519(new Uint8Array(senPubKeyRaw)).buffer as ArrayBuffer
     );
 
     const recipient = await this.suite.createRecipientContext({
@@ -153,8 +160,8 @@ export class InitiatorCryptoContext extends Encrypter {
       senderPublicKey,
     });
 
-    const keySeed = await recipient.export(EXPORT_LABEL_KEY, 32);
-    const nonceSeed = await recipient.export(EXPORT_LABEL_NONCE, 32);
+    const keySeed = await recipient.export(EXPORT_LABEL_KEY, this.suite.aead.keySize);
+    const nonceSeed = await recipient.export(EXPORT_LABEL_NONCE, this.suite.aead.nonceSize);
     const sessionId = await recipient.export(
       EXPORT_LABEL_SESSIONID_RECIPIENT,
       16
@@ -163,9 +170,10 @@ export class InitiatorCryptoContext extends Encrypter {
       EXPORT_LABEL_SESSIONID_SENDER,
       16
     );
-    await recipient.setupBidirectional(keySeed, nonceSeed);
 
-    this.context = recipient;
+    const encContext = await this.suite.aead.createEncryptionContext(keySeed);
+    this.nonce = nonceSeed;
+    this.context = encContext;
     this.sessionId = sessionId;
     this.toSessionId = toSessionId;
 
@@ -173,6 +181,7 @@ export class InitiatorCryptoContext extends Encrypter {
     let plaintext = new ArrayBuffer(0);
     try {
       plaintext = await this.context.open(
+        nonceSeed,
         senderInitCiphertext,
         this.handshakeChannelId
       );
@@ -194,7 +203,7 @@ export class JoinerCryptoContext extends Encrypter {
 
   async initSender(
     receiverPublicKeyRaw: ArrayBuffer,
-    appPayload: ArrayBuffer
+    appPayload: ByteLike
   ): Promise<{
     envelope: HandshakeEnvelope;
     toChannelId: ArrayBuffer;
@@ -203,11 +212,11 @@ export class JoinerCryptoContext extends Encrypter {
   }> {
     const edkp = ed25519.generateKeyPair();
     const x25519sk = ed25519.convertSecretKeyToX25519(edkp.secretKey);
-    const sk = await this.suite.importKey("raw", x25519sk, false);
+    const sk = await this.suite.importKey("raw", x25519sk.buffer as ArrayBuffer, false);
     // import receiver public key received from outside channel
     const recPubKey = await this.suite.importKey(
       "raw",
-      ed25519.convertPublicKeyToX25519(new Uint8Array(receiverPublicKeyRaw))
+      ed25519.convertPublicKeyToX25519(new Uint8Array(receiverPublicKeyRaw)).buffer as ArrayBuffer
     );
 
     // setup sender context
@@ -216,29 +225,30 @@ export class JoinerCryptoContext extends Encrypter {
       senderKey: sk,
     });
 
-    const keySeed = await sender.export(EXPORT_LABEL_KEY, 32);
-    const nonceSeed = await sender.export(EXPORT_LABEL_NONCE, 32);
+    const keySeed = await sender.export(EXPORT_LABEL_KEY, this.suite.aead.keySize);
+    const nonceSeed = await sender.export(EXPORT_LABEL_NONCE, this.suite.aead.nonceSize);
     const toSessionId = await sender.export(
       EXPORT_LABEL_SESSIONID_RECIPIENT,
       16
     );
     const sessionId = await sender.export(EXPORT_LABEL_SESSIONID_SENDER, 16);
 
-    // setup bidirectional encryption
-    await sender.setupBidirectional(keySeed, nonceSeed);
+    const encContext = await this.suite.aead.createEncryptionContext(keySeed);
 
     const toChannelId = await this.deriveChannelId(receiverPublicKeyRaw);
     this.toChannelId = toChannelId;
     this.sessionId = sessionId;
     this.toSessionId = toSessionId;
-    this.context = sender;
-    const senderInitCiphertext = await this.context.seal(
-      appPayload,
+    this.context = encContext;
+    this.nonce = nonceSeed;
+    const senderInitCiphertext = await encContext.seal(
+      nonceSeed,
+      byteParam(appPayload),
       toChannelId
     );
 
     // Create encrypted header containing sender public key
-    const serializedPublicKey = edkp.publicKey;
+    const serializedPublicKey = edkp.publicKey.buffer as ArrayBuffer;
     const { ct: senderPkCiphertext, enc: senderPkContext } =
       await this.suite.seal(
         {

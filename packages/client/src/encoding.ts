@@ -1,4 +1,4 @@
-import base64 from "@stablelib/base64";
+import * as base64 from "@stablelib/base64";
 
 export interface Envelope {
   // header: channelid
@@ -42,12 +42,12 @@ export class Base64EnvelopeEncoding implements EnvelopeEncoding {
     const h = ha.split(this.INTER_SPLIT);
     const p = pa.split(this.INTER_SPLIT);
     const header: HandshakeEnvelope["header"] = [
-      base64.decode(h[0]),
-      base64.decode(h[1]),
+      base64.decode(h[0]).buffer as ArrayBuffer,
+      base64.decode(h[1]).buffer as ArrayBuffer,
     ];
     const payload: HandshakeEnvelope["payload"] = [
-      base64.decode(p[0]),
-      base64.decode(p[1]),
+      base64.decode(p[0]).buffer as ArrayBuffer,
+      base64.decode(p[1]).buffer as ArrayBuffer,
     ];
     return {
       header,
@@ -63,8 +63,8 @@ export class Base64EnvelopeEncoding implements EnvelopeEncoding {
 
   public decodeEnvelope(encoded: string): Envelope {
     const [h, p] = encoded.split(this.INTRA_SPLIT);
-    const header: Envelope["header"] = base64.decode(h);
-    const payload: Envelope["payload"] = base64.decode(p);
+    const header: Envelope["header"] = base64.decode(h).buffer as ArrayBuffer;
+    const payload: Envelope["payload"] = base64.decode(p).buffer as ArrayBuffer;
     return {
       header,
       payload,
@@ -83,7 +83,7 @@ export class InternalFormatJson<T extends ObjectValue = ObjectValue>
 {
   encode(data: T): ArrayBuffer {
     const text = JSON.stringify(data);
-    return new TextEncoder().encode(text);
+    return new TextEncoder().encode(text).buffer;
   }
 
   decode(raw: ArrayBuffer): T {

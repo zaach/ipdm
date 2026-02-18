@@ -40,8 +40,8 @@ export class IPFSBlobRepo implements BlobRepo {
 
   async get(ref: string): Promise<{ data: AsyncIterable<Uint8Array> }> {
     const fs = unixfs(this.#node);
+    // Use CID object from the same multiformats instance as @helia/unixfs
     const cid = CID.parse(ref);
-    // TODO figure out why this hangs for larger files (>100KB)
     const stat = await fs.stat(cid);
     console.log("stat", ref, stat);
 
